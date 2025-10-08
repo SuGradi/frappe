@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "Prompt",
  "creation": "2014-07-11 17:18:09.923399",
@@ -112,7 +113,8 @@
    "fieldtype": "Link",
    "in_standard_filter": 1,
    "label": "Module",
-   "options": "Module Def"
+   "options": "Module Def",
+   "search_index": 1
   },
   {
    "fieldname": "col_break_1",
@@ -291,7 +293,7 @@
  "icon": "fa fa-envelope",
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2024-07-04 05:53:40.595130",
+ "modified": "2025-10-06 09:14:13.579893",
  "modified_by": "Administrator",
  "module": "Email",
  "name": "Notification",
@@ -309,6 +311,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

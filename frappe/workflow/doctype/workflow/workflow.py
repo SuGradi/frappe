@@ -15,9 +15,7 @@ class Workflow(Document):
 
 	if TYPE_CHECKING:
 		from frappe.types import DF
-		from frappe.workflow.doctype.workflow_document_state.workflow_document_state import (
-			WorkflowDocumentState,
-		)
+		from frappe.workflow.doctype.workflow_document_state.workflow_document_state import WorkflowDocumentState
 		from frappe.workflow.doctype.workflow_transition.workflow_transition import WorkflowTransition
 
 		document_type: DF.Link
@@ -29,7 +27,6 @@ class Workflow(Document):
 		workflow_data: DF.JSON | None
 		workflow_name: DF.Data
 		workflow_state_field: DF.Data
-
 	# end: auto-generated types
 	def validate(self):
 		self.set_active()

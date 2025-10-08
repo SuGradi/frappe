@@ -387,16 +387,33 @@ def get_dynamic_link_filters(doctype, links, fieldname):
 	return {doctype_fieldname: doctype_value}
 
 
-def notify_mentions(ref_doctype, ref_name, content):
+"""当用户在评论中被@提及时发送通知
+
+参数:
+- ref_doctype: 引用的文档类型
+- ref_name: 引用的文档名称
+- content: 评论内容
+
+功能说明:
+当用户在评论中使用@提及其他用户时，此函数会提取被提及的用户
+并向他们发送通知，告知谁在哪个文档的评论中提到了他们。
+"""
+def notify_mentions(ref_doctype, ref_name, content):	
+	# 检查必要参数是否存在
 	if ref_doctype and ref_name and content:
+		# 从评论内容中提取被@提及的用户名
 		mentions = extract_mentions(content)
 
+		# 如果没有提到任何用户，则直接返回
 		if not mentions:
 			return
 
+		# 获取当前用户的全名
 		sender_fullname = get_fullname(frappe.session.user)
-		title = get_title(ref_doctype, ref_name)
+		# 获取引用文档的标题 - 使用name字段避免显示邮箱地址
+		title = get_title(ref_doctype, ref_name, title_field="name")
 
+		# 构建收件人列表，只包含启用的系统用户且允许被提及
 		recipients = [
 			frappe.db.get_value(
 				"User",
@@ -406,19 +423,22 @@ def notify_mentions(ref_doctype, ref_name, content):
 			for name in mentions
 		]
 
-		notification_message = _("""{0} mentioned you in a comment in {1} {2}""").format(
-			frappe.bold(sender_fullname), frappe.bold(ref_doctype), get_title_html(title)
+		# 构建通知消息内容
+		notification_message = _("""{0} 在 {1} {2} 的评论中提到了你""").format(
+			frappe.bold(sender_fullname), frappe.bold(_(ref_doctype)), get_title_html(title)
 		)
 
+		# 准备通知文档数据
 		notification_doc = {
-			"type": "Mention",
-			"document_type": ref_doctype,
-			"document_name": ref_name,
-			"subject": notification_message,
-			"from_user": frappe.session.user,
-			"email_content": content,
+			"type": "Mention",  # 通知类型为提及
+			"document_type": ref_doctype,  # 引用的文档类型
+			"document_name": ref_name,  # 引用的文档名称
+			"subject": notification_message,  # 通知主题
+			"from_user": frappe.session.user,  # 发送通知的用户
+			"email_content": content,  # 完整的评论内容
 		}
 
+		# 异步创建并发送通知
 		enqueue_create_notification(recipients, notification_doc)
 
 

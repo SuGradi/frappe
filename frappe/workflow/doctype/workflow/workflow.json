@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "field:workflow_name",
  "creation": "2012-12-28 10:49:55",
@@ -37,7 +38,8 @@
    "in_standard_filter": 1,
    "label": "Document Type",
    "options": "DocType",
-   "reqd": 1
+   "reqd": 1,
+   "search_index": 1
   },
   {
    "default": "0",
@@ -104,10 +106,11 @@
  "icon": "fa fa-random",
  "idx": 1,
  "links": [],
- "modified": "2023-12-08 15:52:37.525003",
+ "modified": "2025-10-06 09:01:17.277081",
  "modified_by": "Administrator",
  "module": "Workflow",
  "name": "Workflow",
+ "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
@@ -121,6 +124,7 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "show_name_in_global_search": 1,
  "sort_field": "modified",
  "sort_order": "DESC",

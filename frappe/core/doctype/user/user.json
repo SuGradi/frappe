@@ -232,7 +232,8 @@
    "fieldtype": "Link",
    "label": "Role Profile",
    "options": "Role Profile",
-   "permlevel": 1
+   "permlevel": 1,
+   "search_index": 1
   },
   {
    "fieldname": "roles_html",
@@ -637,7 +638,8 @@
    "fieldname": "module_profile",
    "fieldtype": "Link",
    "label": "Module Profile",
-   "options": "Module Profile"
+   "options": "Module Profile",
+   "search_index": 1
   },
   {
    "description": "Stores the datetime when the last reset password key was generated.",
@@ -744,8 +746,7 @@
    "description": "Redirect to the selected app after login",
    "fieldname": "default_app",
    "fieldtype": "Select",
-   "label": "Default App",
-   "options": ""
+   "label": "Default App"
   },
   {
    "collapsible": 1,
@@ -875,7 +876,7 @@
   }
  ],
  "make_attachments_public": 1,
- "modified": "2025-05-21 14:57:24.333141",
+ "modified": "2025-09-27 13:39:20.734035",
  "modified_by": "Administrator",
  "module": "Core",
  "name": "User",
@@ -910,9 +911,11 @@
  "row_format": "Dynamic",
  "search_fields": "full_name",
  "show_name_in_global_search": 1,
+ "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
  "title_field": "full_name",
- "track_changes": 1
+ "track_changes": 1,
+ "translated_doctype": 1
 }

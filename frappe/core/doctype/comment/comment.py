@@ -22,33 +22,14 @@ class Comment(Document):
 
 		comment_by: DF.Data | None
 		comment_email: DF.Data | None
-		comment_type: DF.Literal[
-			"Comment",
-			"Like",
-			"Info",
-			"Label",
-			"Workflow",
-			"Created",
-			"Submitted",
-			"Cancelled",
-			"Updated",
-			"Deleted",
-			"Assigned",
-			"Assignment Completed",
-			"Attachment",
-			"Attachment Removed",
-			"Shared",
-			"Unshared",
-			"Bot",
-			"Relinked",
-			"Edit",
-		]
+		comment_type: DF.Literal["Comment", "Like", "Info", "Label", "Workflow", "Created", "Submitted", "Cancelled", "Updated", "Deleted", "Assigned", "Assignment Completed", "Attachment", "Attachment Removed", "Shared", "Unshared", "Bot", "Relinked", "Edit"]
 		content: DF.HTMLEditor | None
 		ip_address: DF.Data | None
 		published: DF.Check
 		reference_doctype: DF.Link | None
 		reference_name: DF.DynamicLink | None
-		reference_owner: DF.Data | None
+		reference_owner: DF.Link | None
+		reference_owner_mail: DF.Data | None
 		seen: DF.Check
 		subject: DF.Text | None
 	# end: auto-generated types
@@ -60,6 +41,12 @@ class Comment(Document):
 		self.notify_change("add")
 
 	def validate(self):
+		if not self.reference_owner:
+			self.reference_owner = frappe.db.get_value(
+				self.reference_doctype, self.reference_name, "owner"
+			)
+		if not self.reference_owner_mail:
+			self.reference_owner_mail = frappe.db.get_value("User", self.reference_owner, "email")
 		if not self.comment_email:
 			self.comment_email = frappe.session.user
 		self.content = frappe.utils.sanitize_html(self.content, always_sanitize=True)

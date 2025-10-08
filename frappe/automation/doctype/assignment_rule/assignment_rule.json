@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "Prompt",
  "creation": "2019-02-28 17:12:18.815830",
@@ -35,7 +36,8 @@
    "in_list_view": 1,
    "label": "Document Type",
    "options": "DocType",
-   "reqd": 1
+   "reqd": 1,
+   "search_index": 1
   },
   {
    "description": "Higher priority rule will be applied first",
@@ -154,10 +156,11 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2021-07-16 22:51:35.505575",
+ "modified": "2025-10-06 09:11:16.407937",
  "modified_by": "Administrator",
  "module": "Automation",
  "name": "Assignment Rule",
+ "naming_rule": "Set by user",
  "owner": "Administrator",
  "permissions": [
   {
@@ -173,7 +176,9 @@
    "write": 1
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
+ "states": [],
  "track_changes": 1
 }
