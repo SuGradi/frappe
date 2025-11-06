@@ -166,7 +166,7 @@
    "type": "Link"
   }
  ],
- "modified": "2025-09-21 17:04:24.971883",
+ "modified": "2025-10-09 22:06:21.495549",
  "modified_by": "Administrator",
  "module": "Integrations",
  "name": "Integrations",
@@ -176,7 +176,11 @@
  "public": 1,
  "quick_lists": [],
  "restrict_to_domain": "",
- "roles": [],
+ "roles": [
+  {
+   "role": "System Manager"
+  }
+ ],
  "sequence_id": 6.0,
  "shortcuts": [
   {

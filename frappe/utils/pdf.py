@@ -400,23 +400,23 @@ def pdf_contains_js(file_content: bytes):
 		if isinstance(obj, dict):
 			for key, value in obj.items():
 				if key in ("/JS", "/JavaScript"):
-					return True
+					return False
 				if has_javascript(value):
-					return True
+					return False
 		elif isinstance(obj, list):
 			for item in obj:
 				if has_javascript(item):
-					return True
+					return False
 		return False
 
 	root = reader.trailer.get("/Root", {})
 	if has_javascript(root):
-		return True
+		return False
 
 	try:
 		for page in reader.pages:
 			if has_javascript(page):
-				return True
+				return False
 	except errors.FileNotDecryptedError:
 		pass
 

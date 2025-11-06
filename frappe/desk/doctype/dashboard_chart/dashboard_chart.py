@@ -356,6 +356,7 @@ class DashboardChart(Document):
 		parent_document_type: DF.Link | None
 		report_name: DF.Link | None
 		roles: DF.Table[HasRole]
+		show_values_over_chart: DF.Check
 		source: DF.Link | None
 		time_interval: DF.Literal["Yearly", "Quarterly", "Monthly", "Weekly", "Daily"]
 		timeseries: DF.Check
@@ -366,7 +367,6 @@ class DashboardChart(Document):
 		value_based_on: DF.Literal[None]
 		x_field: DF.Literal[None]
 		y_axis: DF.Table[DashboardChartField]
-
 	# end: auto-generated types
 	def on_update(self):
 		frappe.cache.delete_key(f"chart-data:{self.name}")

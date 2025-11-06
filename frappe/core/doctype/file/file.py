@@ -499,6 +499,10 @@ class File(Document):
 			# Deletion must still be possible if users have the permission to delete the linked document
 			return
 
+		if ref_doc.docstatus == 1 and ref_doc.has_permission("delete"):
+			# Deletion must still be possible if users have the permission to delete the linked document
+			return
+
 		frappe.throw(
 			msg=_("This file is attached to a protected document and cannot be deleted."),
 			title=_("Protected File"),

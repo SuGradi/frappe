@@ -1,12 +1,14 @@
 {
  "actions": [],
+ "allow_rename": 1,
  "autoname": "Prompt",
  "creation": "2021-04-12 15:17:24.751710",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "user_group_members"
+  "user_group_members",
+  "company"
  ],
  "fields": [
   {
@@ -15,11 +17,19 @@
    "label": "User Group Members",
    "options": "User Group Member",
    "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "\u516c\u53f8",
+   "options": "Company",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2023-08-28 22:25:16.941457",
+ "modified": "2025-11-04 10:23:16.348087",
  "modified_by": "Administrator",
  "module": "Core",
  "name": "User Group",
@@ -43,6 +53,7 @@
    "role": "Desk User"
   }
  ],
+ "row_format": "Dynamic",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

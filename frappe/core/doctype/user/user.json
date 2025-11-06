@@ -17,6 +17,7 @@
   "column_break0",
   "full_name",
   "username",
+  "company",
   "column_break_11",
   "language",
   "time_zone",
@@ -813,6 +814,13 @@
    "fieldname": "dashboard",
    "fieldtype": "Check",
    "label": "Dashboard"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "\u516c\u53f8",
+   "options": "Company",
+   "reqd": 1
   }
  ],
  "icon": "fa fa-user",
@@ -876,7 +884,7 @@
   }
  ],
  "make_attachments_public": 1,
- "modified": "2025-09-27 13:39:20.734035",
+ "modified": "2025-11-06 19:48:55.762698",
  "modified_by": "Administrator",
  "module": "Core",
  "name": "User",

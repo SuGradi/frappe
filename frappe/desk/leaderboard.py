@@ -20,6 +20,7 @@ def get_energy_point_leaderboard(date_range, company=None, field=None, limit=Non
 		filters={
 			"name": ["not in", ["Administrator", "Guest"]],
 			"enabled": 1,
+			"role_profile_name": ["!=", "总经理"],
 			"user_type": ["!=", "Website User"],
 		},
 		pluck="name",

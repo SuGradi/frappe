@@ -156,7 +156,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-10-06 09:11:16.407937",
+ "modified": "2025-10-28 16:36:07.490763",
  "modified_by": "Administrator",
  "module": "Automation",
  "name": "Assignment Rule",
@@ -172,6 +172,17 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "HR",
    "share": 1,
    "write": 1
   }
