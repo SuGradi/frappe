@@ -159,6 +159,9 @@ frappe.data_import.DataExporter = class DataExporter {
 				</button>`
 						: ""
 				}
+				<button class="btn btn-default btn-xs" data-action="select_common_fields">
+					${__("选择常用字段")}
+				</button>
 				<button class="btn btn-default btn-xs" data-action="unselect_all">
 					${__("Unselect All")}
 				</button>
@@ -189,6 +192,55 @@ frappe.data_import.DataExporter = class DataExporter {
 				let field = this.dialog.get_field(fieldname);
 				return field.options
 					.filter((option) => option.danger)
+					.map((option) => option.$checkbox.find("input").get(0));
+			})
+		);
+
+		this.unselect_all();
+		$(checkboxes).prop("checked", true).trigger("change");
+	}
+		
+	// 选择字段属性中包含bold值为1的字段
+	/* // 选择字段属性中包含bold值为1的字段
+      this.dialog.fields.forEach(df => {
+        if (df.fieldtype === "MultiCheck") {
+          const field = this.dialog.get_field(df.fieldname);
+          if (field && field.options) {
+            field.options.forEach(option => {
+              // 通过该字段的value值从数据表tabDocField中获取该字段的fieldname
+              const db_fieldname = frappe.meta.get_docfield(df.fieldname, option.value);
+              if (db_fieldname) {
+                console.log('=============');
+                console.log('option.value:', option.value);
+                console.log('doctype:', df.fieldname);
+                console.log('fieldname:', db_fieldname.fieldname);
+                console.log('bold:', db_fieldname.bold);
+                console.log('=============');
+              }
+              // 选择常用字段common_fields中的字段：common_fields.includes(option.value)
+              // 选择属性中包含bold值为1的字段（确保db_fieldname存在）
+              if (db_fieldname && db_fieldname.bold === 1) {
+                option.$checkbox.find("input").prop("checked", true).trigger("change");
+              }
+            });
+          }
+        }
+      }); */
+
+	select_common_fields() {
+		let multicheck_fields = this.dialog.fields
+			.filter((df) => df.fieldtype === "MultiCheck")
+			.map((df) => df.fieldname);
+
+		let checkboxes = [].concat(
+			...multicheck_fields.map((fieldname) => {
+				let field = this.dialog.get_field(fieldname);
+				return field.options
+					.filter((option) => {
+						const db_fieldname = frappe.meta.get_docfield(fieldname, option.value);
+						console.log('db_fieldname:', db_fieldname);
+						return db_fieldname && db_fieldname.bold === 1;
+					})
 					.map((option) => option.$checkbox.find("input").get(0));
 			})
 		);

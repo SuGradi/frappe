@@ -47,6 +47,7 @@ class File(Document):
 		attached_to_doctype: DF.Link | None
 		attached_to_field: DF.Data | None
 		attached_to_name: DF.Data | None
+		company: DF.Link | None
 		content_hash: DF.Data | None
 		file_name: DF.Data | None
 		file_size: DF.Int
@@ -821,16 +822,41 @@ class File(Document):
 	def zip_files(files):
 		zip_file = io.BytesIO()
 		zf = zipfile.ZipFile(zip_file, "w", zipfile.ZIP_DEFLATED)
+		
+		def add_file_to_zip(_file):
+			if not isinstance(_file, File):
+				return
+			if _file.is_folder:
+				# 递归处理文件夹中的所有文件
+				folder_files = frappe.get_list(
+					"File",
+					filters={"folder": _file.name},
+					fields=["name", "is_folder", "file_name"]
+				)
+				for file_info in folder_files:
+					try:
+						sub_file = frappe.get_doc("File", file_info.name)
+						add_file_to_zip(sub_file)
+					except Exception as e:
+						frappe.logger().error(f"处理文件 {file_info.name} 时出错: {str(e)}")
+			else:
+				if has_permission(_file, "read"):
+					try:
+						content = _file.get_content()
+						if content:
+							zf.writestr(_file.file_name, content)
+					except Exception as e:
+						frappe.logger().error(f"添加文件到zip失败: {str(e)}")
+		
 		for _file in files:
 			if isinstance(_file, str):
-				_file = frappe.get_doc("File", _file)
-			if not isinstance(_file, File):
-				continue
-			if _file.is_folder:
-				continue
-			if not has_permission(_file, "read"):
-				continue
-			zf.writestr(_file.file_name, _file.get_content())
+				try:
+					_file = frappe.get_doc("File", _file)
+				except Exception as e:
+					frappe.logger().error(f"获取文件对象失败: {str(e)}")
+					continue
+			add_file_to_zip(_file)
+		
 		zf.close()
 		return zip_file.getvalue()
 

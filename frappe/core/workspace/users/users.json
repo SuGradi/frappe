@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"b7abeqw4NZ\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"User\",\"col\":3}},{\"id\":\"eghSJPhZRC\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Role\",\"col\":3}},{\"id\":\"uAzl_lT_C0\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Permission Manager\",\"col\":3}},{\"id\":\"oFB4l28FMU\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"NMpIkExl3i\",\"type\":\"card\",\"data\":{\"card_name\":\"Users\",\"col\":4}},{\"id\":\"VepG3durKm\",\"type\":\"card\",\"data\":{\"card_name\":\"Logs\",\"col\":4}},{\"id\":\"S9FeWt7xXE\",\"type\":\"card\",\"data\":{\"card_name\":\"Permissions\",\"col\":4}}]",
+ "content": "[{\"id\":\"b7abeqw4NZ\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"User\",\"col\":3}},{\"id\":\"eghSJPhZRC\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Role\",\"col\":3}},{\"id\":\"uAzl_lT_C0\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Permission Manager\",\"col\":3}},{\"id\":\"oFB4l28FMU\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"NMpIkExl3i\",\"type\":\"card\",\"data\":{\"card_name\":\"\u7528\u6237\",\"col\":4}},{\"id\":\"VepG3durKm\",\"type\":\"card\",\"data\":{\"card_name\":\"Logs\",\"col\":4}},{\"id\":\"S9FeWt7xXE\",\"type\":\"card\",\"data\":{\"card_name\":\"Permissions\",\"col\":4}}]",
  "creation": "2020-03-02 15:12:16.754449",
  "custom_blocks": [],
  "docstatus": 0,
@@ -109,8 +109,8 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Users",
-   "link_count": 4,
+   "label": "\u7528\u6237",
+   "link_count": 5,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -119,7 +119,7 @@
    "dependencies": "",
    "hidden": 0,
    "is_query_report": 0,
-   "label": "User",
+   "label": "\u7528\u6237",
    "link_count": 0,
    "link_to": "User",
    "link_type": "DocType",
@@ -130,7 +130,7 @@
    "dependencies": "",
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Role",
+   "label": "\u89d2\u8272",
    "link_count": 0,
    "link_to": "Role",
    "link_type": "DocType",
@@ -141,7 +141,7 @@
    "dependencies": "",
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Role Profile",
+   "label": "\u5c97\u4f4d",
    "link_count": 0,
    "link_to": "Role Profile",
    "link_type": "DocType",
@@ -151,15 +151,25 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Module Profile",
+   "label": "\u6a21\u5757\u96c6\u5408",
    "link_count": 0,
    "link_to": "Module Profile",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "\u5458\u5de5",
+   "link_count": 0,
+   "link_to": "Employee",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2025-09-21 17:04:24.721812",
+ "modified": "2025-11-13 14:52:21.722690",
  "modified_by": "Administrator",
  "module": "Core",
  "name": "Users",
