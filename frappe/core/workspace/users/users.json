@@ -161,15 +161,15 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "\u5458\u5de5",
+   "label": "\u4e1a\u52a1\u7ec4",
    "link_count": 0,
-   "link_to": "Employee",
+   "link_to": "User Group",
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
   }
  ],
- "modified": "2025-11-13 14:52:21.722690",
+ "modified": "2026-01-08 13:49:28.854776",
  "modified_by": "Administrator",
  "module": "Core",
  "name": "Users",
