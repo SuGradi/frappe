@@ -350,7 +350,7 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 					// ignore
 				}
 				html += `
-					<div class="attached-file-item flex justify-between align-center" style="margin-bottom: 5px; padding: 5px; border: 1px solid var(--border-color); border-radius: 4px;">
+					<div class="attached-file-item flex justify-between align-center" style="margin-bottom: 5px; padding: 5px 10px; border: 1px solid var(--border-color); background-color: var(--control-bg); border-radius: 8px;">
 						<div class="ellipsis" style="flex: 1;">
 							${frappe.utils.icon("es-line-link", "sm")}
 							<a class="attached-file-link" href="${url}" target="_blank">${filename}</a>
