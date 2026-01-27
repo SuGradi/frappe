@@ -411,7 +411,8 @@ function add_files(file_array) {
 				file_obj: file,
 				cropper_file: file,
 				crop_box_data: null,
-				optimize: size_kb > 5120 && is_image && !file.type.includes("svg"),
+				//超过10mb自动优化压缩
+				optimize: size_kb > 10240 && is_image && !file.type.includes("svg"),
 				name: file.name,
 				doc: null,
 				progress: 0,
