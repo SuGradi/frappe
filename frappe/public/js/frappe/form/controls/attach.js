@@ -7,6 +7,37 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 		return false;
 	}
 
+	set_disp_area(value) {
+		let file_urls = this.get_files_from_value(value || this.value);
+		
+		if (file_urls.length > 0) {
+			// 移除外层容器的默认样式（如灰底、边框等），避免样式叠加
+			this.disp_area && $(this.disp_area).removeClass('like-disabled-input form-control');
+			
+			let html = '<div class="attached-files-list">';
+			file_urls.forEach(url => {
+				let filename = url.split("/").pop();
+				try {
+					filename = decodeURI(filename);
+				} catch (e) {
+					// ignore
+				}
+				html += `<div class="attached-file-item flex justify-between align-center" style="margin-bottom: 5px; padding: 5px 10px; border: 1px solid var(--border-color); background-color: var(--control-bg); border-radius: 8px;">
+					<div class="ellipsis" style="flex: 1;">
+						${frappe.utils.icon("es-line-link", "sm")}
+						<a class="attached-file-link" href="${url}" target="_blank" title="${filename}">${filename}</a>
+					</div>
+				</div>`;
+			});
+			html += '</div>';
+			this.disp_area && $(this.disp_area).html(html);
+		} else {
+			// 无文件时恢复默认样式以显示 Placeholder
+			this.disp_area && $(this.disp_area).addClass('like-disabled-input');
+			this.disp_area && $(this.disp_area).html(this.df.placeholder || "");
+		}
+	}
+
 	make_input() {
 		let me = this;
 		this.$input = $('<button class="btn btn-default btn-sm btn-attach">')
