@@ -22,6 +22,75 @@ def remove_attach():
 	frappe.delete_doc("File", fid)
 
 
+def _validate_attachment_delete_permission(doc):
+	if not doc.has_permission("write"):
+		raise frappe.PermissionError
+
+	if not doc.meta.protect_attached_files:
+		return
+
+	if doc.docstatus == 0:
+		return
+
+	if doc.docstatus == 2 and doc.has_permission("delete"):
+		return
+
+	raise frappe.PermissionError
+
+
+@frappe.whitelist(methods=["DELETE", "POST"])
+def remove_attachments(dt: str | None = None, dn: str | None = None, file_ids=None):
+	dt = dt or frappe.form_dict.get("dt")
+	dn = dn or frappe.form_dict.get("dn")
+	file_ids = file_ids or frappe.form_dict.get("file_ids") or "[]"
+	file_ids = frappe.parse_json(file_ids)
+
+	doc = frappe.get_doc(dt, dn)
+	_validate_attachment_delete_permission(doc)
+
+	files = {
+		row.name: row
+		for row in frappe.get_all(
+			"File",
+			fields=["name", "file_name", "attached_to_doctype", "attached_to_name"],
+			filters={"name": ["in", file_ids]},
+		)
+	}
+
+	deleted = []
+	failed = []
+
+	for file_id in file_ids:
+		file_doc = files.get(file_id)
+		if not file_doc:
+			failed.append({"file_id": file_id, "file_name": None, "error": "File not found"})
+			continue
+
+		if file_doc.attached_to_doctype != dt or file_doc.attached_to_name != str(dn):
+			failed.append(
+				{
+					"file_id": file_id,
+					"file_name": file_doc.file_name,
+					"error": "File is not attached to the requested document",
+				}
+			)
+			continue
+
+		try:
+			frappe.delete_doc("File", file_id)
+			deleted.append(file_id)
+		except Exception:
+			failed.append(
+				{
+					"file_id": file_id,
+					"file_name": file_doc.file_name,
+					"error": frappe.get_traceback(with_context=False).splitlines()[-1],
+				}
+			)
+
+	return {"deleted": deleted, "failed": failed}
+
+
 @frappe.whitelist(methods=["POST", "PUT"])
 def add_comment(
 	reference_doctype: str, reference_name: str, content: str, comment_email: str, comment_by: str
