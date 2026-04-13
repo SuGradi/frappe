@@ -436,6 +436,30 @@ body[data-route^="Module"] .main-menu {
 	gap: 6px;
 }
 
+.attachment-action-buttons,
+.attachment-bulk-actions {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.attachment-bulk-actions.hidden,
+.attachment-action-buttons.hidden {
+	display: none;
+}
+
+.attachment-row {
+	display: flex;
+	align-items: center;
+	gap: var(--margin-xs);
+}
+
+.attachment-select-row {
+	display: inline-flex;
+	align-items: center;
+	margin-bottom: 0;
+}
+
 .show-all-btn {
 	--icon-stroke: var(--text-light);
 	width: 100%;
@@ -457,6 +481,7 @@ body[data-route^="Module"] .main-menu {
 	}
 }
 .add-assignment-btn,
+.bulk-delete-attachment-btn,
 .add-attachment-btn,
 .add-review-btn,
 .shares,

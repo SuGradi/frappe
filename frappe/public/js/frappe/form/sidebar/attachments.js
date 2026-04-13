@@ -6,13 +6,14 @@ frappe.ui.form.Attachments = class Attachments {
 
 		this.attachments_page_length = 10; // show n attachments initially
 		this.show_all_attachments = false;
+		this.is_bulk_delete_mode = false;
+		this.selected_attachments = new Set();
 
 		this.make();
 	}
 	make() {
-		var me = this;
-		this.parent.find(".add-attachment-btn").click(function () {
-			me.new_attachment();
+		this.parent.find(".add-attachment-btn").on("click", () => {
+			this.new_attachment();
 		});
 
 		this.parent.find(".explore-link").click(() => {
@@ -26,6 +27,13 @@ frappe.ui.form.Attachments = class Attachments {
 
 		this.add_attachment_wrapper = this.parent.find(".attachments-actions");
 		this.attachments_label = this.parent.find(".attachments-label");
+		this.bulk_delete_btn = this.parent.find(".bulk-delete-attachment-btn");
+		this.bulk_delete_actions = this.parent.find(".attachment-bulk-actions");
+		this.selection_count = this.parent.find(".attachment-selection-count");
+		this.delete_selected_btn = this.parent.find(".attachment-delete-selected-btn");
+		this.cancel_selection_btn = this.parent.find(".attachment-cancel-selection-btn");
+
+		this.setup_bulk_delete_actions();
 	}
 	max_reached(raise_exception = false) {
 		const attachment_count = Object.keys(this.get_attachments()).length;
@@ -49,13 +57,14 @@ frappe.ui.form.Attachments = class Attachments {
 			return;
 		}
 		this.parent.toggle(true);
+		this.sync_selected_attachments();
 		this.parent.find(".attachment-row").remove();
 
-		var max_reached = this.max_reached();
-		this.add_attachment_wrapper.find(".add-attachment-btn").toggle(!max_reached);
+		const max_reached = this.max_reached();
+		const attachments = this.get_attachments();
+		this.render_actions_state(max_reached, attachments);
 
 		// add attachment objects
-		var attachments = this.get_attachments();
 		this.render_attachments(attachments);
 		this.setup_show_all_button(attachments);
 	}
@@ -72,10 +81,33 @@ frappe.ui.form.Attachments = class Attachments {
 		}
 
 		show_all_btn.removeClass("hidden");
-		show_all_btn.click(() => {
+		show_all_btn.off("click").on("click", (event) => {
+			event.preventDefault();
 			show_all_btn.addClass("hidden");
 			this.show_all_attachments = true;
 			this.refresh();
+		});
+	}
+
+	setup_bulk_delete_actions() {
+		this.bulk_delete_btn.on("click", () => {
+			this.enter_bulk_delete_mode();
+		});
+
+		this.cancel_selection_btn.on("click", () => {
+			this.exit_bulk_delete_mode();
+		});
+
+		this.delete_selected_btn.on("click", () => {
+			const fileids = this.get_selected_attachments();
+			if (!fileids.length) return;
+
+			frappe.confirm(
+				__(
+					"This will permanently delete the selected attachments and their underlying files. Continue?"
+				),
+				() => this.remove_attachments(fileids)
+			);
 		});
 	}
 
@@ -84,7 +116,6 @@ frappe.ui.form.Attachments = class Attachments {
 	}
 
 	render_attachments(attachments) {
-		var me = this;
 		let attachments_to_render = attachments;
 
 		let is_slicable = attachments.length > this.attachments_page_length;
@@ -95,14 +126,8 @@ frappe.ui.form.Attachments = class Attachments {
 		}
 
 		if (attachments_to_render.length) {
-			let exists = {};
-			let unique_attachments = attachments_to_render.filter((attachment) => {
-				return Object.prototype.hasOwnProperty.call(exists, attachment.file_name)
-					? false
-					: (exists[attachment.file_name] = true);
-			});
-			unique_attachments.forEach((attachment) => {
-				me.add_attachment(attachment);
+			attachments_to_render.forEach((attachment) => {
+				this.add_attachment(attachment);
 			});
 		}
 
@@ -113,14 +138,12 @@ frappe.ui.form.Attachments = class Attachments {
 	}
 
 	add_attachment(attachment) {
-		var file_name = attachment.file_name;
-		var file_url = this.get_file_url(attachment);
-		var fileid = attachment.name;
+		let file_name = attachment.file_name;
+		let file_url = this.get_file_url(attachment);
+		let fileid = attachment.name;
 		if (!file_name) {
 			file_name = file_url;
 		}
-
-		var me = this;
 
 		let file_label = `
 			<a href="${file_url}" target="_blank" title="${frappe.utils.escape_html(file_name)}"
@@ -130,18 +153,10 @@ frappe.ui.form.Attachments = class Attachments {
 			</a>`;
 
 		let remove_action = null;
-		if (this.can_delete_attachment()) {
-			remove_action = function (target_id) {
-				frappe.confirm(__("Are you sure you want to delete the attachment?"), function () {
-					let target_attachment = me
-						.get_attachments()
-						.find((attachment) => attachment.name === target_id);
-					let to_be_removed = me
-						.get_attachments()
-						.filter(
-							(attachment) => attachment.file_name === target_attachment.file_name
-						);
-					to_be_removed.forEach((attachment) => me.remove_attachment(attachment.name));
+		if (this.can_delete_attachment() && !this.is_bulk_delete_mode) {
+			remove_action = (target_id) => {
+				frappe.confirm(__("Are you sure you want to delete the attachment?"), () => {
+					this.remove_attachment(target_id);
 				});
 				return false;
 			};
@@ -151,9 +166,133 @@ frappe.ui.form.Attachments = class Attachments {
 				${frappe.utils.icon(attachment.is_private ? "es-line-lock" : "es-line-unlock", "sm ml-0")}
 			</a>`;
 
-		$(`<li class="attachment-row">`)
-			.append(frappe.get_data_pill(file_label, fileid, remove_action, icon))
+		const row = $(`<li class="attachment-row">`);
+
+		if (this.is_bulk_delete_mode) {
+			const checkbox = $(`
+				<label class="attachment-select-row">
+					<input type="checkbox">
+				</label>
+			`);
+
+			checkbox.find("input")
+				.prop("checked", this.selected_attachments.has(fileid))
+				.on("change", (event) => {
+					this.toggle_attachment_selection(fileid, event.currentTarget.checked);
+				});
+
+			row.append(checkbox);
+		}
+
+		row.append(frappe.get_data_pill(file_label, fileid, remove_action, icon))
 			.insertAfter(this.add_attachment_wrapper);
+	}
+
+	enter_bulk_delete_mode() {
+		if (!this.can_delete_attachment() || !this.get_attachments().length) return;
+		this.is_bulk_delete_mode = true;
+		this.refresh();
+	}
+
+	exit_bulk_delete_mode(clear_selection = true) {
+		this.is_bulk_delete_mode = false;
+		if (clear_selection) {
+			this.selected_attachments.clear();
+		}
+		this.refresh();
+	}
+
+	render_actions_state(max_reached, attachments) {
+		const can_delete = this.can_delete_attachment();
+		const has_attachments = attachments.length > 0;
+
+		this.add_attachment_wrapper
+			.find(".add-attachment-btn")
+			.toggle(!this.is_bulk_delete_mode && !max_reached);
+
+		this.bulk_delete_btn.toggleClass(
+			"hidden",
+			!can_delete || !has_attachments || this.is_bulk_delete_mode
+		);
+		this.bulk_delete_actions.toggleClass("hidden", !this.is_bulk_delete_mode);
+		this.selection_count.text(__("Selected {0}", [this.selected_attachments.size]));
+		this.delete_selected_btn.prop("disabled", !this.selected_attachments.size);
+	}
+
+	toggle_attachment_selection(fileid, checked) {
+		if (checked) {
+			this.selected_attachments.add(fileid);
+		} else {
+			this.selected_attachments.delete(fileid);
+		}
+
+		this.render_actions_state(this.max_reached(), this.get_attachments());
+	}
+
+	get_selected_attachments() {
+		return Array.from(this.selected_attachments);
+	}
+
+	sync_selected_attachments() {
+		const attachment_ids = new Set(this.get_attachments().map((attachment) => attachment.name));
+
+		this.selected_attachments.forEach((fileid) => {
+			if (!attachment_ids.has(fileid)) {
+				this.selected_attachments.delete(fileid);
+			}
+		});
+
+		if (!this.selected_attachments.size && this.is_bulk_delete_mode && !attachment_ids.size) {
+			this.is_bulk_delete_mode = false;
+		}
+	}
+
+	remove_attachments(fileids) {
+		return frappe.call({
+			method: "frappe.desk.form.utils.remove_attachments",
+			type: "DELETE",
+			args: {
+				dt: this.frm.doctype,
+				dn: this.frm.docname,
+				file_ids: fileids,
+			},
+			callback: (r) => {
+				if (r.exc) {
+					if (!r._server_messages) frappe.msgprint(__("There were errors"));
+					return;
+				}
+
+				const deleted = r.message?.deleted || [];
+				const failed = r.message?.failed || [];
+
+				this.selected_attachments = new Set(failed.map((row) => row.file_id));
+
+				if (!failed.length) {
+					this.is_bulk_delete_mode = false;
+				}
+
+				this.frm.sidebar.reload_docinfo(() => {
+					if (!failed.length) {
+						frappe.show_alert(__("Deleted {0} attachments", [deleted.length]));
+						return;
+					}
+
+					const error_rows = failed
+						.map((row) => {
+							const file = frappe.utils.escape_html(row.file_name || row.file_id);
+							const error = frappe.utils.escape_html(row.error || __("Unknown error"));
+							return `<div>${file}: ${error}</div>`;
+						})
+						.join("");
+
+					frappe.msgprint({
+						title: __("Some attachments could not be deleted"),
+						message: error_rows,
+						indicator: "orange",
+					});
+				});
+			},
+		});
 	}
 
 	can_delete_attachment() {
@@ -280,7 +419,7 @@ frappe.ui.form.Attachments = class Attachments {
 		var attachments = this.get_attachments();
 		var new_attachments = [];
 		$.each(attachments, function (i, attachment) {
-			if (attachment.name != fileid) {
+			if (attachment.name !== fileid) {
 				new_attachments.push(attachment);
 			}
 		});

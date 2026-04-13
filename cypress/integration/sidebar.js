@@ -82,6 +82,56 @@ context("Sidebar", () => {
 		});
 	});
 
+	// Batch delete selectors:
+	// .bulk-delete-attachment-btn
+	// .attachment-bulk-actions
+	// .attachment-selection-count
+	// .attachment-delete-selected-btn
+	// .attachment-cancel-selection-btn
+	// .attachment-select-row
+	it("supports batch deleting attachments from the sidebar", () => {
+		cy.call("frappe.tests.ui_test_helpers.create_todo", {
+			description: "Sidebar Bulk Delete ToDo",
+		}).then((todo) => {
+			cy.visit(`/app/todo/${todo.message.name}`);
+
+			attach_file("cypress/fixtures/sample_attachments/attachment-2.txt");
+			attach_file("cypress/fixtures/sample_attachments/attachment-3.txt");
+			attach_file("cypress/fixtures/sample_attachments/attachment-4.txt");
+
+			cy.get(".bulk-delete-attachment-btn").click();
+			cy.get(".attachment-bulk-actions").should("be.visible");
+			cy.get(".attachment-select-row input[type='checkbox']").should("have.length", 3);
+
+			cy.get(".attachment-select-row input[type='checkbox']").eq(0).check({ force: true });
+			cy.get(".attachment-select-row input[type='checkbox']").eq(1).check({ force: true });
+			cy.get(".attachment-selection-count").should("contain", "2");
+
+			cy.get(".attachment-delete-selected-btn").click();
+			cy.findByRole("button", { name: "Yes" }).click();
+
+			cy.get(".attachment-row").should("have.length", 1);
+			cy.get(".attachment-bulk-actions").should("not.be.visible");
+		});
+	});
+
+	it("cancels sidebar attachment selection mode", () => {
+		cy.call("frappe.tests.ui_test_helpers.create_todo", {
+			description: "Sidebar Bulk Delete Cancel ToDo",
+		}).then((todo) => {
+			cy.visit(`/app/todo/${todo.message.name}`);
+
+			attach_file("cypress/fixtures/sample_attachments/attachment-5.txt");
+
+			cy.get(".bulk-delete-attachment-btn").click();
+			cy.get(".attachment-select-row input[type='checkbox']").check({ force: true });
+			cy.get(".attachment-cancel-selection-btn").click();
+
+			cy.get(".attachment-bulk-actions").should("not.be.visible");
+			cy.get(".attachment-select-row input[type='checkbox']").should("not.exist");
+		});
+	});
+
 	it('Test for checking "Assigned To" counter value, adding filter and adding & removing an assignment', () => {
 		cy.call("frappe.tests.ui_test_helpers.create_todo", {
 			description: "Sidebar Attachment ToDo",

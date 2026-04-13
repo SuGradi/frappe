@@ -54,23 +54,37 @@
 		<div class="assignments"></div>
 	</li>
 </ul>
-<ul class="list-unstyled sidebar-menu form-attachments">
-	<li class="attachments-actions">
-		<span class="form-sidebar-items">
-			<span>
-				<svg class="es-icon ml-0 icon-sm">
+	<ul class="list-unstyled sidebar-menu form-attachments">
+		<li class="attachments-actions">
+			<span class="form-sidebar-items">
+				<span>
+					<svg class="es-icon ml-0 icon-sm">
 					<use href="#es-line-attachment"></use>
 				</svg>
-				<a class="pill-label ellipsis explore-link">
-					{%= __("Attachments") %}
-				</a>
+					<a class="pill-label ellipsis explore-link">
+						{%= __("Attachments") %}
+					</a>
+				</span>
+				<span class="attachment-action-buttons">
+					<button class="bulk-delete-attachment-btn btn btn-link icon-btn hidden">
+						<svg class="es-icon icon-sm"><use href="#es-line-delete"></use></svg>
+					</button>
+					<button class="add-attachment-btn btn btn-link icon-btn">
+						<svg class="es-icon icon-sm"><use href="#es-line-add"></use></svg>
+					</button>
+				</span>
+				<span class="attachment-bulk-actions hidden">
+					<span class="attachment-selection-count"></span>
+					<button class="attachment-delete-selected-btn btn btn-xs btn-danger">
+						{%= __("Delete Selected") %}
+					</button>
+					<button class="attachment-cancel-selection-btn btn btn-xs btn-secondary">
+						{%= __("Cancel") %}
+					</button>
+				</span>
 			</span>
-			<button class="add-attachment-btn btn btn-link icon-btn">
-				<svg class="es-icon icon-sm"><use href="#es-line-add"></use></svg>
-			</button>
-		</span>
-	</li>
-	<a class="show-all-btn hidden" href="">
+		</li>
+		<a class="show-all-btn hidden" href="">
 		<svg class="es-icon icon-sm">
 			<use href="#es-line-preview"></use>
 		</svg>
