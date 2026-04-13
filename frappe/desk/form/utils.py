@@ -63,7 +63,7 @@ def remove_attachments(dt: str | None = None, dn: str | None = None, file_ids=No
 	for file_id in file_ids:
 		file_doc = files.get(file_id)
 		if not file_doc:
-			failed.append({"file_id": file_id, "file_name": None, "error": "File not found"})
+			failed.append({"file_id": file_id, "file_name": None, "error": _("文件不存在")})
 			continue
 
 		if file_doc.attached_to_doctype != dt or file_doc.attached_to_name != str(dn):
@@ -71,7 +71,7 @@ def remove_attachments(dt: str | None = None, dn: str | None = None, file_ids=No
 				{
 					"file_id": file_id,
 					"file_name": file_doc.file_name,
-					"error": "File is not attached to the requested document",
+					"error": _("文件不属于当前文档"),
 				}
 			)
 			continue

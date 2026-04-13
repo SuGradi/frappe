@@ -38,23 +38,36 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 		}
 	}
 
-	make_input() {
-		let me = this;
-		this.$input = $('<button class="btn btn-default btn-sm btn-attach">')
-			.html(__("Attach"))
-			.prependTo(me.input_area)
-			.on({
-				click: function () {
-					me.on_attach_click();
-				},
-				attach_doc_image: function () {
-					me.on_attach_doc_image();
-				},
-			});
-		this.$value = $(
-			`<div class="attached-file flex justify-between align-center">
-				<div class="ellipsis">
-				${frappe.utils.icon("es-line-link", "sm")}
+		make_input() {
+			let me = this;
+			this.$action_buttons = $('<div class="attach-action-buttons flex" style="gap: 8px;"></div>').prependTo(
+				me.input_area
+			);
+			this.$input = $('<button class="btn btn-default btn-sm btn-attach">')
+				.html(__("Attach"))
+				.appendTo(this.$action_buttons)
+				.on({
+					click: function () {
+						me.on_attach_click();
+					},
+					attach_doc_image: function () {
+						me.on_attach_doc_image();
+					},
+				});
+			this.$bulk_delete_toggle = $(`
+				<button
+					class="btn btn-default btn-sm btn-attach-bulk-delete hidden"
+					data-action="enter_bulk_delete_mode"
+					title="${__("批量删除")}"
+					aria-label="${__("批量删除")}"
+				>
+					${frappe.utils.icon("es-line-delete", "sm")}
+				</button>
+			`).appendTo(this.$action_buttons);
+			this.$value = $(
+				`<div class="attached-file flex justify-between align-center">
+					<div class="ellipsis">
+					${frappe.utils.icon("es-line-link", "sm")}
 					<a class="attached-file-link" target="_blank"></a>
 				</div>
 				<div>
@@ -62,21 +75,245 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 					<a class="btn btn-xs btn-default" data-action="clear_attachment">${__("Clear")}</a>
 				</div>
 			</div>`
-		)
-			.prependTo(me.input_area)
-			.toggle(false);
-		// 多文件列表容器
-		this.$file_list = null;
-		this.input = this.$input.get(0);
-		this.set_input_attributes();
-		this.has_input = true;
+			)
+				.prependTo(me.input_area)
+				.toggle(false);
+			// 多文件列表容器
+			this.$file_list = null;
+			this.is_bulk_delete_mode = false;
+			this.selected_files = new Set();
+			this.input = this.$input.get(0);
+			this.set_input_attributes();
+			this.has_input = true;
 
-		frappe.utils.bind_actions_with_object(this.$value, this);
-		this.toggle_reload_button();
-	}
-	clear_attachment() {
-		let me = this;
-		if (this.is_multiple_mode()) {
+			frappe.utils.bind_actions_with_object(this.$value, this);
+			frappe.utils.bind_actions_with_object(this.$action_buttons, this);
+			this.toggle_reload_button();
+		}
+
+		enter_bulk_delete_mode() {
+			if (!this.is_multiple_mode()) return;
+			if (!this.get_files_from_value(this.value).length) return;
+			this.is_bulk_delete_mode = true;
+			this.render_files();
+		}
+
+		cancel_bulk_delete() {
+			this.exit_bulk_delete_mode();
+		}
+
+		exit_bulk_delete_mode(clear_selection = true) {
+			this.is_bulk_delete_mode = false;
+			if (clear_selection) {
+				this.selected_files.clear();
+			}
+			this.render_files();
+		}
+
+		toggle_file_selection(file_url, checked) {
+			if (checked) {
+				this.selected_files.add(file_url);
+			} else {
+				this.selected_files.delete(file_url);
+			}
+			this.render_files();
+		}
+
+		toggle_selected_file(e, $el) {
+			const file_url = decodeURIComponent($el.data("fileUrl"));
+			this.toggle_file_selection(file_url, $el.prop("checked"));
+		}
+
+		get_selected_files() {
+			return Array.from(this.selected_files);
+		}
+
+		get_file_name_from_url(file_url) {
+			let filename = file_url.split("/").pop();
+			try {
+				filename = decodeURIComponent(filename);
+			} catch (e) {
+				// ignore
+			}
+			return filename;
+		}
+
+		sync_selected_files(file_urls) {
+			const available_urls = new Set(file_urls);
+			this.selected_files.forEach((file_url) => {
+				if (!available_urls.has(file_url)) {
+					this.selected_files.delete(file_url);
+				}
+			});
+
+			if (!file_urls.length) {
+				this.is_bulk_delete_mode = false;
+			}
+		}
+
+		find_attachment_by_url(file_url) {
+			if (!this.frm?.attachments) return null;
+
+			const target = decodeURI(file_url);
+			return (this.frm.attachments.get_attachments() || []).find((attachment) => {
+				const attachment_url = decodeURI(attachment.file_url || "");
+				return (
+					attachment_url === target ||
+					attachment_url === "/" + target ||
+					"/" + attachment_url === target ||
+					(attachment.file_name && target.endsWith(attachment.file_name))
+				);
+			});
+		}
+
+		get_selected_attachments_payload() {
+			const matched = [];
+			const unmatched = [];
+
+			this.get_selected_files().forEach((url) => {
+				const attachment = this.find_attachment_by_url(url);
+				if (attachment) {
+					matched.push({ url, file_id: attachment.name, file_name: attachment.file_name });
+				} else {
+					unmatched.push(url);
+				}
+			});
+
+			return { matched, unmatched };
+		}
+
+		show_bulk_delete_failures(failures) {
+			if (!failures.length) return;
+
+			const message = failures
+				.map((row) => {
+					const file = frappe.utils.escape_html(row.file_name);
+					const error = frappe.utils.escape_html(row.error || __("未知错误"));
+					return `<div>${file}: ${error}</div>`;
+				})
+				.join("");
+
+			frappe.msgprint({
+				title: __("部分附件删除失败"),
+				message,
+				indicator: "orange",
+			});
+		}
+
+		async update_field_value_and_save(file_urls) {
+			const next_value = file_urls.length ? JSON.stringify(file_urls) : JSON.stringify([]);
+
+			if (this.frm) {
+				await this.parse_validate_and_set_in_model(next_value);
+				this.refresh();
+				if (this.frm.is_dirty()) {
+					this.frm.save(this.frm.doc.docstatus == 1 ? "Update" : "Save");
+				}
+				return;
+			}
+
+			this.set_input(next_value);
+			await this.parse_validate_and_set_in_model(next_value);
+			this.refresh();
+		}
+
+		async on_bulk_delete_complete(r, matched, unmatched, progress_title) {
+			if (r.exc) {
+				frappe.hide_progress();
+				if (!r._server_messages) frappe.msgprint(__("删除附件时发生错误"));
+				return;
+			}
+
+			const deleted_ids = new Set(r.message?.deleted || []);
+			const failed_rows = r.message?.failed || [];
+			const failed_ids = new Set(failed_rows.map((row) => row.file_id));
+			const deleted_urls = matched
+				.filter((row) => deleted_ids.has(row.file_id))
+				.map((row) => row.url);
+			const failed_urls = matched
+				.filter((row) => failed_ids.has(row.file_id))
+				.map((row) => row.url)
+				.concat(unmatched);
+			const current_urls = this.get_files_from_value(this.value);
+			const next_urls = current_urls.filter((url) => !deleted_urls.includes(url));
+			const failures = [
+				...failed_rows.map((row) => ({
+					file_name: row.file_name || row.file_id,
+					error: row.error || __("未知错误"),
+				})),
+				...unmatched.map((url) => ({
+					file_name: this.get_file_name_from_url(url),
+					error: __("文件不存在"),
+				})),
+			];
+
+			this.selected_files = new Set(failed_urls);
+			if (!failed_urls.length) {
+				this.is_bulk_delete_mode = false;
+			}
+
+			if (!deleted_urls.length) {
+				frappe.hide_progress();
+				this.render_files();
+				this.show_bulk_delete_failures(failures);
+				return;
+			}
+
+			if (this.frm?.sidebar) {
+				await new Promise((resolve) => this.frm.sidebar.reload_docinfo(() => resolve()));
+			}
+
+			await this.update_field_value_and_save(next_urls);
+			frappe.show_progress(progress_title, 100, 100, __("删除完成"), true);
+
+			if (failures.length) {
+				this.show_bulk_delete_failures(failures);
+			} else {
+				frappe.show_alert(__("已删除 {0} 个附件", [deleted_urls.length]));
+			}
+		}
+
+		delete_selected_files() {
+			const { matched, unmatched } = this.get_selected_attachments_payload();
+			if (!matched.length && !unmatched.length) return;
+
+			frappe.confirm(__("将永久删除所选附件及其底层文件，是否继续？"), () => {
+				const progress_title = __("正在删除附件");
+				frappe.show_progress(
+					progress_title,
+					0,
+					100,
+					__("正在删除 {0} 个附件，请稍候…", [matched.length + unmatched.length])
+				);
+
+				if (!matched.length) {
+					frappe.hide_progress();
+					this.selected_files = new Set(unmatched);
+					this.show_bulk_delete_failures(
+						unmatched.map((url) => ({
+							file_name: this.get_file_name_from_url(url),
+							error: __("文件不存在"),
+						}))
+					);
+					return;
+				}
+
+				frappe.call({
+					method: "frappe.desk.form.utils.remove_attachments",
+					type: "DELETE",
+					args: {
+						dt: this.frm.doctype,
+						dn: this.frm.docname,
+						file_ids: matched.map((row) => row.file_id),
+					},
+					callback: (r) => this.on_bulk_delete_complete(r, matched, unmatched, progress_title),
+				});
+			});
+		}
+
+		clear_attachment() {
+			let me = this;
+			if (this.is_multiple_mode()) {
 			// 多文件模式：清空所有文件
 			frappe.confirm(__("Are you sure you want to delete all attachments?"), function () {
 				let file_urls = [];
@@ -354,44 +591,80 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 		return [];
 	}
 
-	render_files() {
-		let file_urls = this.get_files_from_value(this.value);
+		render_files() {
+			let file_urls = this.get_files_from_value(this.value);
 
-		if (!Array.isArray(file_urls)) {
-			file_urls = [file_urls];
-		}
+			if (!Array.isArray(file_urls)) {
+				file_urls = [file_urls];
+			}
 
-		// 隐藏旧的单文件 UI 容器
-		if (this.$value) this.$value.toggle(false);
+			this.sync_selected_files(file_urls);
+			this.$bulk_delete_toggle?.toggleClass(
+				"hidden",
+				!this.is_multiple_mode() || !file_urls.length || this.is_bulk_delete_mode
+			);
 
-		// 控制 Attach 按钮显隐：多文件模式常显，单文件模式仅在无文件时显示
-		if (this.is_multiple_mode()) {
-			this.$input.toggle(true);
-		} else {
-			this.$input.toggle(file_urls.length === 0);
-		}
+			// 隐藏旧的单文件 UI 容器
+			if (this.$value) this.$value.toggle(false);
 
-		if (file_urls.length > 0) {
-			let html = '<div class="attached-files-list" style="margin-top: 10px;">';
-			file_urls.forEach((url, index) => {
-				let filename = url.split("/").pop();
-				try {
-					filename = decodeURI(filename);
-				} catch (e) {
-					// ignore
+			// 控制 Attach 按钮显隐：多文件模式常显，单文件模式仅在无文件时显示
+			if (this.is_multiple_mode()) {
+				this.$input.toggle(!this.is_bulk_delete_mode);
+			} else {
+				this.$input.toggle(file_urls.length === 0);
+			}
+
+			if (file_urls.length > 0) {
+				let bulk_actions_html = "";
+				if (this.is_multiple_mode()) {
+					if (this.is_bulk_delete_mode) {
+						bulk_actions_html = `
+							<div class="attach-bulk-actions flex align-center" style="gap: 8px; margin-bottom: 10px;">
+								<span class="attach-selection-count">${__("已选择 {0} 项", [this.selected_files.size])}</span>
+								<button class="btn btn-xs btn-danger" data-action="delete_selected_files"${this.selected_files.size ? "" : " disabled"}>
+									${__("删除")}
+								</button>
+								<button class="btn btn-xs btn-secondary" data-action="cancel_bulk_delete">
+									${__("取消")}
+								</button>
+							</div>
+						`;
+					}
 				}
-				html += `
-					<div class="attached-file-item flex justify-between align-center" style="margin-bottom: 5px; padding: 5px 10px; border: 1px solid var(--border-color); background-color: var(--control-bg); border-radius: 8px;">
-						<div class="ellipsis" style="flex: 1;">
-							${frappe.utils.icon("es-line-link", "sm")}
-							<a class="attached-file-link" href="${url}" target="_blank">${filename}</a>
+
+				let html = `<div class="attached-files-list" style="margin-top: 10px;">${bulk_actions_html}`;
+				file_urls.forEach((url, index) => {
+					const filename = this.get_file_name_from_url(url);
+					const selector_html = this.is_bulk_delete_mode
+						? `
+							<label class="attach-multi-select-row" style="margin-right: 8px;">
+								<input
+									type="checkbox"
+									data-action="toggle_selected_file"
+									data-file-url="${encodeURIComponent(url)}"
+									${this.selected_files.has(url) ? "checked" : ""}
+								>
+							</label>
+						`
+						: "";
+					const clear_html = this.is_bulk_delete_mode
+						? ""
+						: `<a class="btn btn-xs btn-default" data-action="remove_file" data-index="${index}">${__("Clear")}</a>`;
+					html += `
+						<div class="attached-file-item flex justify-between align-center" style="margin-bottom: 5px; padding: 5px 10px; border: 1px solid var(--border-color); background-color: var(--control-bg); border-radius: 8px;">
+							<div class="flex align-center" style="flex: 1; min-width: 0;">
+								${selector_html}
+							<div class="ellipsis" style="flex: 1;">
+								${frappe.utils.icon("es-line-link", "sm")}
+								<a class="attached-file-link" href="${url}" target="_blank">${filename}</a>
+							</div>
+							</div>
+							<div>
+								${clear_html}
+							</div>
 						</div>
-						<div>
-							<a class="btn btn-xs btn-default" data-action="remove_file" data-index="${index}">${__("Clear")}</a>
-						</div>
-					</div>
-				`;
-			});
+					`;
+				});
 			html += "</div>";
 
 			if (this.$file_list) {
@@ -407,9 +680,9 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 		}
 	}
 
-remove_file(e, $el) {
-		let index = parseInt($el.data('index'));
-		let me = this;
+		remove_file(e, $el) {
+			let index = parseInt($el.data('index'));
+			let me = this;
 
 		frappe.confirm(__("Are you sure you want to delete the attachment?"), function () {
 			let file_urls = me.get_files_from_value(me.value);
@@ -425,26 +698,7 @@ remove_file(e, $el) {
 				return;
 			}
 
-			let file_id = null;
-			if (me.frm && me.frm.attachments) {
-				let attachments = me.frm.attachments.get_attachments();
-				if (attachments) {
-					let target = decodeURI(removed_url);
-					for (let a of attachments) {
-						let a_url = decodeURI(a.file_url);
-						// 尝试多种匹配方式以应对编码和路径前缀差异
-						if (
-							a_url === target ||
-							a_url === "/" + target ||
-							"/" + a_url === target ||
-							(a.file_name && target.endsWith(a.file_name))
-						) {
-							file_id = a.name;
-							break;
-						}
-					}
-				}
-			}
+				let file_id = me.find_attachment_by_url(removed_url)?.name;
 
 			let update_field_and_save = () => {
 				file_urls.splice(index, 1);

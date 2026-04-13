@@ -163,6 +163,64 @@ context("Attach Control", () => {
 		cy.findByRole("button", { name: "Camera" }).should("not.exist");
 	});
 });
+
+context("Multiple Attach Control", () => {
+	before(() => {
+		cy.login();
+		cy.visit("/app/doctype");
+		return cy
+			.window()
+			.its("frappe")
+			.then((frappe) => {
+				return frappe.xcall("frappe.tests.ui_test_helpers.create_doctype", {
+					name: "Test Multiple Attach Control",
+					fields: [
+						{
+							label: "Attach Files",
+							fieldname: "attach_files",
+							fieldtype: "Attach",
+							options: "multiple",
+							in_list_view: 1,
+						},
+					],
+				});
+			});
+	});
+
+	it("supports bulk deleting files from a multiple attach field", () => {
+		cy.new_form("Test Multiple Attach Control");
+		cy.findByRole("button", { name: "Attach" }).click();
+		cy.get_open_dialog()
+			.find(".file-upload-area")
+			.selectFile(
+				[
+					"cypress/fixtures/sample_attachments/attachment-2.txt",
+					"cypress/fixtures/sample_attachments/attachment-3.txt",
+					"cypress/fixtures/sample_attachments/attachment-4.txt",
+				],
+				{ action: "drag-drop" }
+			);
+		cy.get_open_dialog().findByRole("button", { name: "Upload" }).click();
+
+		cy.get(".attached-file-item").should("have.length", 3);
+		cy.get(".btn-attach-bulk-delete").should("be.visible").click();
+		cy.contains("已选择 0 项").should("be.visible");
+		cy.contains("button", "删除").should("be.visible");
+		cy.contains("button", "取消").should("be.visible");
+		cy.get(".attach-multi-select-row input[type='checkbox']").eq(0).check({ force: true });
+		cy.get(".attach-multi-select-row input[type='checkbox']").eq(1).check({ force: true });
+		cy.contains("已选择 2 项").should("be.visible");
+
+		cy.contains("button", "删除").click();
+		cy.get_open_dialog()
+			.find(".modal-body")
+			.should("contain", "将永久删除所选附件及其底层文件，是否继续？");
+		cy.get_open_dialog().find(".modal-footer .btn-primary").click();
+		cy.get(".modal-title").should("contain", "正在删除附件");
+		cy.get(".attached-file-item").should("have.length", 1);
+	});
+});
+
 context("Attach Control with Failed Document Save", () => {
 	before(() => {
 		cy.login();

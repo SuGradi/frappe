@@ -101,14 +101,21 @@ context("Sidebar", () => {
 
 			cy.get(".bulk-delete-attachment-btn").click();
 			cy.get(".attachment-bulk-actions").should("be.visible");
+			cy.get(".attachment-selection-count").should("contain", "已选择 0 项");
+			cy.get(".attachment-delete-selected-btn").should("contain", "删除");
+			cy.get(".attachment-cancel-selection-btn").should("contain", "取消");
 			cy.get(".attachment-select-row input[type='checkbox']").should("have.length", 3);
 
 			cy.get(".attachment-select-row input[type='checkbox']").eq(0).check({ force: true });
 			cy.get(".attachment-select-row input[type='checkbox']").eq(1).check({ force: true });
-			cy.get(".attachment-selection-count").should("contain", "2");
+			cy.get(".attachment-selection-count").should("contain", "已选择 2 项");
 
 			cy.get(".attachment-delete-selected-btn").click();
-			cy.findByRole("button", { name: "Yes" }).click();
+			cy.get_open_dialog()
+				.find(".modal-body")
+				.should("contain", "将永久删除所选附件及其底层文件，是否继续？");
+			cy.get_open_dialog().find(".modal-footer .btn-primary").click();
+			cy.get(".modal-title").should("contain", "正在删除附件");
 
 			cy.get(".attachment-row").should("have.length", 1);
 			cy.get(".attachment-bulk-actions").should("not.be.visible");

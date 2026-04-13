@@ -103,9 +103,7 @@ frappe.ui.form.Attachments = class Attachments {
 			if (!fileids.length) return;
 
 			frappe.confirm(
-				__(
-					"This will permanently delete the selected attachments and their underlying files. Continue?"
-				),
+				__("将永久删除所选附件及其底层文件，是否继续？"),
 				() => this.remove_attachments(fileids)
 			);
 		});
@@ -215,7 +213,7 @@ frappe.ui.form.Attachments = class Attachments {
 			!can_delete || !has_attachments || this.is_bulk_delete_mode
 		);
 		this.bulk_delete_actions.toggleClass("hidden", !this.is_bulk_delete_mode);
-		this.selection_count.text(__("Selected {0}", [this.selected_attachments.size]));
+		this.selection_count.text(__("已选择 {0} 项", [this.selected_attachments.size]));
 		this.delete_selected_btn.prop("disabled", !this.selected_attachments.size);
 	}
 
@@ -248,6 +246,10 @@ frappe.ui.form.Attachments = class Attachments {
 	}
 
 	remove_attachments(fileids) {
+		const progress_title = __("正在删除附件");
+		const progress_description = __("正在删除 {0} 个附件，请稍候…", [fileids.length]);
+		frappe.show_progress(progress_title, 0, 100, progress_description);
+
 		return frappe.call({
 			method: "frappe.desk.form.utils.remove_attachments",
 			type: "DELETE",
@@ -258,7 +260,8 @@ frappe.ui.form.Attachments = class Attachments {
 			},
 			callback: (r) => {
 				if (r.exc) {
-					if (!r._server_messages) frappe.msgprint(__("There were errors"));
+					frappe.hide_progress();
+					if (!r._server_messages) frappe.msgprint(__("删除附件时发生错误"));
 					return;
 				}
 
@@ -272,21 +275,23 @@ frappe.ui.form.Attachments = class Attachments {
 				}
 
 				this.frm.sidebar.reload_docinfo(() => {
+					frappe.show_progress(progress_title, 100, 100, __("删除完成"), true);
+
 					if (!failed.length) {
-						frappe.show_alert(__("Deleted {0} attachments", [deleted.length]));
+						frappe.show_alert(__("已删除 {0} 个附件", [deleted.length]));
 						return;
 					}
 
 					const error_rows = failed
 						.map((row) => {
 							const file = frappe.utils.escape_html(row.file_name || row.file_id);
-							const error = frappe.utils.escape_html(row.error || __("Unknown error"));
+							const error = frappe.utils.escape_html(row.error || __("未知错误"));
 							return `<div>${file}: ${error}</div>`;
 						})
 						.join("");
 
 					frappe.msgprint({
-						title: __("Some attachments could not be deleted"),
+						title: __("部分附件删除失败"),
 						message: error_rows,
 						indicator: "orange",
 					});
