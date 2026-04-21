@@ -820,7 +820,7 @@
    "fieldtype": "Link",
    "label": "\u516c\u53f8",
    "options": "Company",
-   "reqd": 1
+    "reqd": 0
   }
  ],
  "icon": "fa fa-user",

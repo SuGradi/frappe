@@ -470,8 +470,23 @@ def get_workspace_sidebar_items():
 		pages.extend(private_pages)
 
 	if len(pages) == 0:
-		pages = [frappe.get_doc("Workspace", "Welcome Workspace").as_dict()]
-		pages[0]["label"] = _("Welcome Workspace")
+		fallback_workspace = "Welcome Workspace"
+		if not frappe.db.exists("Workspace", fallback_workspace):
+			fallback_workspace = "Home" if frappe.db.exists("Workspace", "Home") else None
+			if not fallback_workspace:
+				first_public = frappe.get_all(
+					"Workspace",
+					fields=["name"],
+					filters={"public": 1},
+					order_by=order_by,
+					ignore_permissions=True,
+					limit=1,
+				)
+				fallback_workspace = first_public[0]["name"] if first_public else None
+
+		if fallback_workspace:
+			pages = [frappe.get_doc("Workspace", fallback_workspace).as_dict()]
+			pages[0]["label"] = _(pages[0].get("title") or pages[0].get("name"))
 
 	return {
 		"pages": pages,
