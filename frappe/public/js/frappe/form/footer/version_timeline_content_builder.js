@@ -137,14 +137,10 @@ function get_version_timeline_content(version_doc, frm) {
 	if (data.row_changed && data.row_changed.length) {
 		let parts = [];
 		data.row_changed.every(function (row) {
+			const child_doctype = get_table_field_doctype(frm, row[0]);
 			row[3].every(function (p) {
 				var df =
-					frm.fields_dict[row[0]] &&
-					frappe.meta.get_docfield(
-						frm.fields_dict[row[0]].grid.doctype,
-						p[0],
-						frm.docname
-					);
+					child_doctype && frappe.meta.get_docfield(child_doctype, p[0], frm.docname);
 
 				if (df && (!df.hidden || df.show_on_timeline)) {
 					var field_display_status = frappe.perm.get_field_display_status(
@@ -160,7 +156,7 @@ function get_version_timeline_content(version_doc, frm) {
 					) {
 						parts.push(
 							__("{0} from {1} to {2} in row #{3}", [
-								frappe.meta.get_label(frm.fields_dict[row[0]].grid.doctype, p[0]),
+								frappe.meta.get_label(child_doctype, p[0]),
 								format_content_for_timeline(p[1]),
 								format_content_for_timeline(p[2]),
 								row[1] + 1,
@@ -266,6 +262,15 @@ function get_version_timeline_content(version_doc, frm) {
 		out = out.map((message) => `${message} · ${audit_msg.bold()}`);
 	}
 	return out;
+}
+
+function get_table_field_doctype(frm, fieldname) {
+	const field = frm.fields_dict[fieldname];
+	if (!field) {
+		return null;
+	}
+
+	return (field.grid && field.grid.doctype) || (field.df && field.df.options) || null;
 }
 
 function get_version_comment(version_doc, text) {
