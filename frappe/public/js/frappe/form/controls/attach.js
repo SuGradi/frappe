@@ -1,3 +1,134 @@
+const ATTACHMENT_LIGHTBOX_CSS_URL = "https://sys.autohaina.com/files/fancybox.css";
+const ATTACHMENT_LIGHTBOX_JS_URL = "https://sys.autohaina.com/files/fancybox.umd.js";
+
+frappe.provide("frappe.ui.form");
+
+frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_lightbox_helper || function () {
+	if (frappe.ui.form.__attachment_lightbox_helper) {
+		return frappe.ui.form.__attachment_lightbox_helper;
+	}
+
+	const helper = {
+		resource_promise: null,
+		normalize_url(url) {
+			if (!url) return "";
+
+			try {
+				const parsed = new URL(url, window.location.origin);
+				return parsed.pathname + parsed.search;
+			} catch (error) {
+				return String(url).split("#")[0];
+			}
+		},
+		is_image_url(url) {
+			const normalized = this.normalize_url(url).split("?")[0].toLowerCase();
+			return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/.test(normalized);
+		},
+		get_filename(url) {
+			let filename = (this.normalize_url(url).split("/").pop() || "").split("?")[0];
+			try {
+				filename = decodeURIComponent(filename);
+			} catch (error) {
+				// ignore malformed url encoding
+			}
+			return filename;
+		},
+		build_items_from_urls(file_urls) {
+			return (file_urls || [])
+				.filter((url) => this.is_image_url(url))
+				.map((url) => ({
+					src: url,
+					type: "image",
+					caption: this.get_filename(url),
+				}));
+		},
+		build_items_from_attachments(attachments) {
+			return (attachments || [])
+				.filter((attachment) => attachment && this.is_image_url(attachment.file_url))
+				.map((attachment) => ({
+					src: attachment.file_url,
+					type: "image",
+					caption: attachment.file_name || this.get_filename(attachment.file_url),
+				}));
+		},
+		ensure_resources() {
+			if (typeof window === "undefined") {
+				return Promise.resolve();
+			}
+
+			if (window.Fancybox && typeof window.Fancybox.show === "function") {
+				return Promise.resolve(window.Fancybox);
+			}
+
+			if (this.resource_promise) {
+				return this.resource_promise;
+			}
+
+			this.resource_promise = new Promise((resolve, reject) => {
+				if (!document.querySelector('link[data-attachment-lightbox="css"]')) {
+					const link = document.createElement("link");
+					link.rel = "stylesheet";
+					link.href = ATTACHMENT_LIGHTBOX_CSS_URL;
+					link.dataset.attachmentLightbox = "css";
+					document.head.appendChild(link);
+				}
+
+				const existing_script = document.querySelector('script[data-attachment-lightbox="js"]');
+				if (existing_script) {
+					if (window.Fancybox && typeof window.Fancybox.show === "function") {
+						resolve(window.Fancybox);
+						return;
+					}
+					existing_script.addEventListener("load", () => resolve(window.Fancybox), { once: true });
+					existing_script.addEventListener("error", reject, { once: true });
+					return;
+				}
+
+				const script = document.createElement("script");
+				script.src = ATTACHMENT_LIGHTBOX_JS_URL;
+				script.async = true;
+				script.dataset.attachmentLightbox = "js";
+				script.onload = () => resolve(window.Fancybox);
+				script.onerror = reject;
+				document.head.appendChild(script);
+			});
+
+			return this.resource_promise;
+		},
+		open(items, current_url) {
+			if (!items || !items.length) {
+				return Promise.resolve();
+			}
+
+			const normalized_current = this.normalize_url(current_url);
+			const startIndex = Math.max(
+				0,
+				items.findIndex((item) => this.normalize_url(item.src) === normalized_current)
+			);
+
+			return this.ensure_resources().then((Fancybox) => {
+				if (!Fancybox || typeof Fancybox.show !== "function") {
+					return;
+				}
+
+				Fancybox.show(items, {
+					startIndex,
+					dragToClose: false,
+					fadeEffect: false,
+					zoomEffect: false,
+					showClass: false,
+					hideClass: false,
+					hideScrollbar: false,
+					placeFocusBack: false,
+				});
+			});
+		},
+	};
+
+	frappe.ui.form.__attachment_lightbox_helper = helper;
+	return helper;
+};
+
 frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.ControlData {
 	is_multiple_mode() {
 		const options = this.df.options;
@@ -31,11 +162,29 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 			});
 			html += '</div>';
 			this.disp_area && $(this.disp_area).html(html);
+			this.bind_attachment_lightbox($(this.disp_area), file_urls);
 		} else {
 			// 无文件时恢复默认样式以显示 Placeholder
 			this.disp_area && $(this.disp_area).addClass('like-disabled-input');
 			this.disp_area && $(this.disp_area).html(this.df.placeholder || "");
 		}
+	}
+
+	bind_attachment_lightbox($container, file_urls) {
+		if (!$container || !$container.length) {
+			return;
+		}
+
+		const helper = frappe.ui.form.get_attachment_lightbox_helper();
+		$container.off("click.attachmentLightbox").on("click.attachmentLightbox", ".attached-file-link", (event) => {
+			const href = event.currentTarget.getAttribute("href");
+			if (!helper.is_image_url(href)) {
+				return;
+			}
+
+			event.preventDefault();
+			helper.open(helper.build_items_from_urls(file_urls), href);
+		});
 	}
 
 		make_input() {
@@ -671,6 +820,7 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 				this.$file_list.remove();
 			}
 			this.$file_list = $(html).appendTo(this.input_area);
+			this.bind_attachment_lightbox(this.$file_list, file_urls);
 
 			frappe.utils.bind_actions_with_object(this.$file_list, this);
 		} else {
@@ -731,3 +881,9 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 		});
 	}
 };
+
+if (typeof module !== "undefined" && module.exports) {
+	module.exports = {
+		get_attachment_lightbox_helper: frappe.ui.form.get_attachment_lightbox_helper,
+	};
+}

@@ -12,8 +12,15 @@ frappe.ui.form.Attachments = class Attachments {
 		this.make();
 	}
 	make() {
+		this.attachment_lightbox = frappe.ui.form.get_attachment_lightbox_helper
+			? frappe.ui.form.get_attachment_lightbox_helper()
+			: null;
 		this.parent.find(".add-attachment-btn").on("click", () => {
 			this.new_attachment();
+		});
+
+		this.parent.on("click", ".attachment-link", (event) => {
+			this.preview_attachment(event);
 		});
 
 		this.parent.find(".explore-link").click(() => {
@@ -145,7 +152,7 @@ frappe.ui.form.Attachments = class Attachments {
 
 		let file_label = `
 			<a href="${file_url}" target="_blank" title="${frappe.utils.escape_html(file_name)}"
-				class="ellipsis" style="max-width: calc(100% - 43px);"
+				class="ellipsis attachment-link" style="max-width: calc(100% - 43px);"
 			>
 				<span>${file_name}</span>
 			</a>`;
@@ -184,6 +191,26 @@ frappe.ui.form.Attachments = class Attachments {
 
 		row.append(frappe.get_data_pill(file_label, fileid, remove_action, icon))
 			.insertAfter(this.add_attachment_wrapper);
+	}
+
+	preview_attachment(event) {
+		if (!this.attachment_lightbox) {
+			return;
+		}
+
+		const href = event.currentTarget.getAttribute("href");
+		if (!this.attachment_lightbox.is_image_url(href)) {
+			return;
+		}
+
+		event.preventDefault();
+		const items = this.attachment_lightbox.build_items_from_attachments(
+			(this.get_attachments() || []).map((attachment) => ({
+				file_url: this.get_file_url(attachment),
+				file_name: attachment.file_name,
+			}))
+		);
+		this.attachment_lightbox.open(items, href);
 	}
 
 	enter_bulk_delete_mode() {
