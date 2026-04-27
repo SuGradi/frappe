@@ -18,6 +18,7 @@ class UserGroup(Document):
 		from frappe.types import DF
 
 		company: DF.Link
+		team_leader: DF.Link | None
 		user_group_members: DF.TableMultiSelect[UserGroupMember]
 	# end: auto-generated types
 	def after_insert(self):

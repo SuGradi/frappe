@@ -8,7 +8,8 @@
  "engine": "InnoDB",
  "field_order": [
   "user_group_members",
-  "company"
+  "company",
+  "team_leader"
  ],
  "fields": [
   {
@@ -27,11 +28,17 @@
    "label": "\u516c\u53f8",
    "options": "Company",
    "reqd": 1
+  },
+  {
+   "fieldname": "team_leader",
+   "fieldtype": "Link",
+   "label": "\u7ec4\u957f",
+   "options": "User"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-03-20 10:49:25.123389",
+ "modified": "2026-04-27 12:03:39.201932",
  "modified_by": "Administrator",
  "module": "Core",
  "name": "User Group",
