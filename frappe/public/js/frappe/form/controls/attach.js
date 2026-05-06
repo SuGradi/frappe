@@ -24,6 +24,42 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 			const normalized = this.normalize_url(url).split("?")[0].toLowerCase();
 			return /\.(avif|bmp|gif|ico|jpe?g|png|svg|webp)$/.test(normalized);
 		},
+		is_video_url(url) {
+			const normalized = this.normalize_url(url).split("?")[0].toLowerCase();
+			return /\.(m4v|mov|mp4|og[gv]|webm)$/.test(normalized);
+		},
+		is_pdf_url(url) {
+			const normalized = this.normalize_url(url).split("?")[0].toLowerCase();
+			return /\.pdf$/.test(normalized);
+		},
+		is_previewable_url(url) {
+			return this.is_image_url(url) || this.is_video_url(url) || this.is_pdf_url(url);
+		},
+		get_video_format(url) {
+			const normalized = this.normalize_url(url).split("?")[0].toLowerCase();
+			const match = normalized.match(/\.([^.]+)$/);
+
+			if (!match) return "video/mp4";
+
+			const extension = match[1];
+			if (["ogv", "ogg"].includes(extension)) return "video/ogg";
+			if (extension === "webm") return "video/webm";
+			return "video/mp4";
+		},
+		build_item(url, caption) {
+			const type = this.is_video_url(url) ? "html5video" : this.is_pdf_url(url) ? "pdf" : "image";
+			const item = {
+				src: url,
+				type,
+				caption: caption || this.get_filename(url),
+			};
+
+			if (item.type === "html5video") {
+				item.html5videoFormat = this.get_video_format(url);
+			}
+
+			return item;
+		},
 		get_filename(url) {
 			let filename = (this.normalize_url(url).split("/").pop() || "").split("?")[0];
 			try {
@@ -35,21 +71,18 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 		},
 		build_items_from_urls(file_urls) {
 			return (file_urls || [])
-				.filter((url) => this.is_image_url(url))
-				.map((url) => ({
-					src: url,
-					type: "image",
-					caption: this.get_filename(url),
-				}));
+				.filter((url) => this.is_previewable_url(url))
+				.map((url) => this.build_item(url));
 		},
 		build_items_from_attachments(attachments) {
 			return (attachments || [])
-				.filter((attachment) => attachment && this.is_image_url(attachment.file_url))
-				.map((attachment) => ({
-					src: attachment.file_url,
-					type: "image",
-					caption: attachment.file_name || this.get_filename(attachment.file_url),
-				}));
+				.filter((attachment) => attachment && this.is_previewable_url(attachment.file_url))
+				.map((attachment) =>
+					this.build_item(
+						attachment.file_url,
+						attachment.file_name || this.get_filename(attachment.file_url)
+					)
+				);
 		},
 		ensure_resources() {
 			if (typeof window === "undefined") {
@@ -178,7 +211,7 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 		const helper = frappe.ui.form.get_attachment_lightbox_helper();
 		$container.off("click.attachmentLightbox").on("click.attachmentLightbox", ".attached-file-link", (event) => {
 			const href = event.currentTarget.getAttribute("href");
-			if (!helper.is_image_url(href)) {
+			if (!helper.is_previewable_url(href)) {
 				return;
 			}
 

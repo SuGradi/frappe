@@ -66,31 +66,69 @@ global.$ = function () {
 
 const { get_attachment_lightbox_helper } = require("./attach.js");
 
-test("attachment lightbox helper detects image urls and ignores non-images", () => {
+test("attachment lightbox helper detects previewable image video and pdf urls", () => {
   const helper = get_attachment_lightbox_helper();
 
   assert.equal(helper.is_image_url("/files/demo.jpg"), true);
   assert.equal(helper.is_image_url("https://sys.autohaina.com/files/demo.png?ver=1"), true);
   assert.equal(helper.is_image_url("/files/demo.pdf"), false);
   assert.equal(helper.is_image_url("/files/demo.mp4"), false);
+  assert.equal(helper.is_video_url("/files/demo.mp4"), true);
+  assert.equal(helper.is_video_url("/files/demo.webm?ver=1"), true);
+  assert.equal(helper.is_video_url("/files/demo.pdf"), false);
+  assert.equal(helper.is_pdf_url("/files/demo.pdf"), true);
+  assert.equal(helper.is_pdf_url("/files/demo.pdf?ver=1"), true);
+  assert.equal(helper.is_pdf_url("/files/demo.docx"), false);
+  assert.equal(helper.is_previewable_url("/files/demo.jpg"), true);
+  assert.equal(helper.is_previewable_url("/files/demo.mp4"), true);
+  assert.equal(helper.is_previewable_url("/files/demo.pdf"), true);
+  assert.equal(helper.is_previewable_url("/files/demo.docx"), false);
+  assert.equal(helper.get_video_format("/files/demo.ogv"), "video/ogg");
+  assert.equal(helper.get_video_format("/files/demo.webm"), "video/webm");
+  assert.equal(helper.get_video_format("/files/demo.mov"), "video/mp4");
 });
 
-test("attachment lightbox helper builds grouped image items from urls and attachments", () => {
+test("attachment lightbox helper builds grouped previewable items from urls and attachments", () => {
   const helper = get_attachment_lightbox_helper();
 
   assert.deepEqual(helper.build_items_from_urls([
     "/files/a.jpg",
-    "/files/b.pdf",
+    "/files/b.docx",
     "/files/c.webp",
+    "/files/d.mp4",
+    "/files/e.webm",
+    "/files/f.pdf",
   ]), [
     { src: "/files/a.jpg", type: "image", caption: "a.jpg" },
     { src: "/files/c.webp", type: "image", caption: "c.webp" },
+    {
+      src: "/files/d.mp4",
+      type: "html5video",
+      caption: "d.mp4",
+      html5videoFormat: "video/mp4",
+    },
+    {
+      src: "/files/e.webm",
+      type: "html5video",
+      caption: "e.webm",
+      html5videoFormat: "video/webm",
+    },
+    { src: "/files/f.pdf", type: "pdf", caption: "f.pdf" },
   ]);
 
   assert.deepEqual(helper.build_items_from_attachments([
     { file_url: "/files/a.jpg", file_name: "A 图" },
-    { file_url: "/files/b.pdf", file_name: "B 文档" },
+    { file_url: "/files/b.docx", file_name: "B 文档" },
+    { file_url: "/files/c.mov", file_name: "C 视频" },
+    { file_url: "/files/d.pdf", file_name: "D PDF" },
   ]), [
     { src: "/files/a.jpg", type: "image", caption: "A 图" },
+    {
+      src: "/files/c.mov",
+      type: "html5video",
+      caption: "C 视频",
+      html5videoFormat: "video/mp4",
+    },
+    { src: "/files/d.pdf", type: "pdf", caption: "D PDF" },
   ]);
 });
