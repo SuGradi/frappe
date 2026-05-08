@@ -66,7 +66,7 @@ global.$ = function () {
 
 const { get_attachment_lightbox_helper } = require("./attach.js");
 
-test("attachment lightbox helper detects previewable image video and pdf urls", () => {
+test("attachment lightbox helper detects previewable image and video urls", () => {
   const helper = get_attachment_lightbox_helper();
 
   assert.equal(helper.is_image_url("/files/demo.jpg"), true);
@@ -76,19 +76,16 @@ test("attachment lightbox helper detects previewable image video and pdf urls", 
   assert.equal(helper.is_video_url("/files/demo.mp4"), true);
   assert.equal(helper.is_video_url("/files/demo.webm?ver=1"), true);
   assert.equal(helper.is_video_url("/files/demo.pdf"), false);
-  assert.equal(helper.is_pdf_url("/files/demo.pdf"), true);
-  assert.equal(helper.is_pdf_url("/files/demo.pdf?ver=1"), true);
-  assert.equal(helper.is_pdf_url("/files/demo.docx"), false);
   assert.equal(helper.is_previewable_url("/files/demo.jpg"), true);
   assert.equal(helper.is_previewable_url("/files/demo.mp4"), true);
-  assert.equal(helper.is_previewable_url("/files/demo.pdf"), true);
+  assert.equal(helper.is_previewable_url("/files/demo.pdf"), false);
   assert.equal(helper.is_previewable_url("/files/demo.docx"), false);
   assert.equal(helper.get_video_format("/files/demo.ogv"), "video/ogg");
   assert.equal(helper.get_video_format("/files/demo.webm"), "video/webm");
   assert.equal(helper.get_video_format("/files/demo.mov"), "video/mp4");
 });
 
-test("attachment lightbox helper builds grouped previewable items from urls and attachments", () => {
+test("attachment lightbox helper builds grouped media items from urls and attachments", () => {
   const helper = get_attachment_lightbox_helper();
 
   assert.deepEqual(helper.build_items_from_urls([
@@ -113,7 +110,6 @@ test("attachment lightbox helper builds grouped previewable items from urls and 
       caption: "e.webm",
       html5videoFormat: "video/webm",
     },
-    { src: "/files/f.pdf", type: "pdf", caption: "f.pdf" },
   ]);
 
   assert.deepEqual(helper.build_items_from_attachments([
@@ -129,6 +125,5 @@ test("attachment lightbox helper builds grouped previewable items from urls and 
       caption: "C 视频",
       html5videoFormat: "video/mp4",
     },
-    { src: "/files/d.pdf", type: "pdf", caption: "D PDF" },
   ]);
 });

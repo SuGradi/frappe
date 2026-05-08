@@ -28,12 +28,8 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 			const normalized = this.normalize_url(url).split("?")[0].toLowerCase();
 			return /\.(m4v|mov|mp4|og[gv]|webm)$/.test(normalized);
 		},
-		is_pdf_url(url) {
-			const normalized = this.normalize_url(url).split("?")[0].toLowerCase();
-			return /\.pdf$/.test(normalized);
-		},
 		is_previewable_url(url) {
-			return this.is_image_url(url) || this.is_video_url(url) || this.is_pdf_url(url);
+			return this.is_image_url(url) || this.is_video_url(url);
 		},
 		get_video_format(url) {
 			const normalized = this.normalize_url(url).split("?")[0].toLowerCase();
@@ -47,10 +43,9 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 			return "video/mp4";
 		},
 		build_item(url, caption) {
-			const type = this.is_video_url(url) ? "html5video" : this.is_pdf_url(url) ? "pdf" : "image";
 			const item = {
 				src: url,
-				type,
+				type: this.is_video_url(url) ? "html5video" : "image",
 				caption: caption || this.get_filename(url),
 			};
 
