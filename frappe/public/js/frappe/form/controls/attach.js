@@ -305,6 +305,14 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 			return Array.from(this.selected_files);
 		}
 
+		toggle_all_file_selection() {
+			const file_urls = this.get_files_from_value(this.value);
+			const all_selected = file_urls.length && file_urls.every((url) => this.selected_files.has(url));
+
+			this.selected_files = new Set(all_selected ? [] : file_urls);
+			this.render_files();
+		}
+
 		get_file_name_from_url(file_url) {
 			let filename = file_url.split("/").pop();
 			try {
@@ -409,18 +417,14 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 				.map((row) => row.url);
 			const failed_urls = matched
 				.filter((row) => failed_ids.has(row.file_id))
-				.map((row) => row.url)
-				.concat(unmatched);
+				.map((row) => row.url);
+			const removed_urls = deleted_urls.concat(unmatched);
 			const current_urls = this.get_files_from_value(this.value);
-			const next_urls = current_urls.filter((url) => !deleted_urls.includes(url));
+			const next_urls = current_urls.filter((url) => !removed_urls.includes(url));
 			const failures = [
 				...failed_rows.map((row) => ({
 					file_name: row.file_name || row.file_id,
 					error: row.error || __("未知错误"),
-				})),
-				...unmatched.map((url) => ({
-					file_name: this.get_file_name_from_url(url),
-					error: __("文件不存在"),
 				})),
 			];
 
@@ -429,7 +433,7 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 				this.is_bulk_delete_mode = false;
 			}
 
-			if (!deleted_urls.length) {
+			if (!removed_urls.length) {
 				frappe.hide_progress();
 				this.render_files();
 				this.show_bulk_delete_failures(failures);
@@ -454,7 +458,7 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 			const { matched, unmatched } = this.get_selected_attachments_payload();
 			if (!matched.length && !unmatched.length) return;
 
-			frappe.confirm(__("将永久删除所选附件及其底层文件，是否继续？"), () => {
+			frappe.confirm(__("将永久删除所选附件及其底层文件，是否继续？"), async () => {
 				const progress_title = __("正在删除附件");
 				frappe.show_progress(
 					progress_title,
@@ -465,13 +469,7 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 
 				if (!matched.length) {
 					frappe.hide_progress();
-					this.selected_files = new Set(unmatched);
-					this.show_bulk_delete_failures(
-						unmatched.map((url) => ({
-							file_name: this.get_file_name_from_url(url),
-							error: __("文件不存在"),
-						}))
-					);
+					await this.on_bulk_delete_complete({ message: { deleted: [], failed: [] } }, [], unmatched, progress_title);
 					return;
 				}
 
@@ -795,9 +793,13 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 				let bulk_actions_html = "";
 				if (this.is_multiple_mode()) {
 					if (this.is_bulk_delete_mode) {
+						const all_selected = file_urls.length && file_urls.every((url) => this.selected_files.has(url));
 						bulk_actions_html = `
 							<div class="attach-bulk-actions flex align-center" style="gap: 8px; margin-bottom: 10px;">
 								<span class="attach-selection-count">${__("已选择 {0} 项", [this.selected_files.size])}</span>
+								<button class="btn btn-xs btn-default" data-action="toggle_all_file_selection">
+									${all_selected ? __("取消全选") : __("全选")}
+								</button>
 								<button class="btn btn-xs btn-danger" data-action="delete_selected_files"${this.selected_files.size ? "" : " disabled"}>
 									${__("删除")}
 								</button>

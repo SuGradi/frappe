@@ -66,6 +66,10 @@ global.$ = function () {
 
 const { get_attachment_lightbox_helper } = require("./attach.js");
 
+global.frappe.hide_progress = () => {};
+global.frappe.show_progress = () => {};
+global.frappe.show_alert = () => {};
+
 test("attachment lightbox helper detects previewable image and video urls", () => {
   const helper = get_attachment_lightbox_helper();
 
@@ -126,4 +130,60 @@ test("attachment lightbox helper builds grouped media items from urls and attach
       html5videoFormat: "video/mp4",
     },
   ]);
+});
+
+test("bulk delete removes selected stale urls from multi-attach field", async () => {
+  const control = Object.create(frappe.ui.form.ControlAttach.prototype);
+  const stale_url = "/files/missing-from-current-attachments.jpg";
+  const kept_url = "/files/keep.jpg";
+  let next_urls = null;
+  let failures = null;
+
+  control.value = JSON.stringify([stale_url, kept_url]);
+  control.selected_files = new Set([stale_url]);
+  control.is_bulk_delete_mode = true;
+  control.frm = null;
+  control.get_files_from_value = frappe.ui.form.ControlAttach.prototype.get_files_from_value;
+  control.update_field_value_and_save = async (urls) => {
+    next_urls = urls;
+  };
+  control.show_bulk_delete_failures = (rows) => {
+    failures = rows;
+  };
+  control.render_files = () => {};
+  control.get_file_name_from_url = frappe.ui.form.ControlAttach.prototype.get_file_name_from_url;
+
+  await control.on_bulk_delete_complete(
+    { message: { deleted: [], failed: [] } },
+    [],
+    [stale_url],
+    "Deleting"
+  );
+
+  assert.deepEqual(next_urls, [kept_url]);
+  assert.equal(control.selected_files.size, 0);
+  assert.equal(control.is_bulk_delete_mode, false);
+  assert.equal(failures, null);
+});
+
+test("bulk delete select all toggles every file in multi-attach field", () => {
+  const control = Object.create(frappe.ui.form.ControlAttach.prototype);
+  const file_urls = ["/files/a.jpg", "/files/b.jpg", "/files/c.jpg"];
+  let render_count = 0;
+
+  control.value = JSON.stringify(file_urls);
+  control.selected_files = new Set();
+  control.get_files_from_value = frappe.ui.form.ControlAttach.prototype.get_files_from_value;
+  control.render_files = () => {
+    render_count += 1;
+  };
+
+  control.toggle_all_file_selection();
+
+  assert.deepEqual(control.get_selected_files(), file_urls);
+
+  control.toggle_all_file_selection();
+
+  assert.deepEqual(control.get_selected_files(), []);
+  assert.equal(render_count, 2);
 });
