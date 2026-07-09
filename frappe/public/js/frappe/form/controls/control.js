@@ -3,6 +3,7 @@ import "./base_input";
 import "./data";
 import "./int";
 import "./float";
+import "./multi_currency";
 import "./currency";
 import "./date";
 import "./time";

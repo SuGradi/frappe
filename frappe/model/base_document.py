@@ -55,6 +55,13 @@ TABLE_DOCTYPES_FOR_DOCTYPE = {df["fieldname"]: df["options"] for df in DOCTYPE_T
 DOCTYPES_FOR_DOCTYPE = {"DocType", *TABLE_DOCTYPES_FOR_DOCTYPE.values()}
 
 
+def _is_multi_currency_df(df):
+	return df and df.get("fieldtype") == "Currency" and (
+		cstr(df.get("options")).strip() == "Multi Currency"
+		or cstr(df.get("options")).strip().startswith("Multi Currency:")
+	)
+
+
 def get_controller(doctype):
 	"""
 	Returns the locally cached **class** object of the given DocType.
@@ -400,7 +407,11 @@ class BaseDocument:
 				elif df.fieldtype == "JSON" and isinstance(value, dict):
 					value = json.dumps(value, separators=(",", ":"))
 
-				elif df.fieldtype in float_like_fields and not isinstance(value, float):
+				elif (
+					df.fieldtype in float_like_fields
+					and not isinstance(value, float)
+					and not _is_multi_currency_df(df)
+				):
 					value = flt(value)
 
 				elif (df.fieldtype in datetime_fields and value == "") or (
@@ -726,7 +737,7 @@ class BaseDocument:
 				if df.fieldtype == "Int":
 					self.set(df.fieldname, cint(self.get(df.fieldname)))
 
-				elif df.fieldtype in ("Float", "Currency", "Percent"):
+				elif df.fieldtype in ("Float", "Currency", "Percent") and not _is_multi_currency_df(df):
 					self.set(df.fieldname, flt(self.get(df.fieldname)))
 
 		# calling the docstatus property does the job

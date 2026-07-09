@@ -805,8 +805,15 @@ from {tables}
 			escape = True
 			df = meta.get("fields", {"fieldname": f.fieldname})
 			df = df[0] if df else None
+			is_multi_currency = False
+			if df:
+				from frappe.utils.multi_currency import is_multi_currency_df
 
-			if df and df.fieldtype in ("Check", "Float", "Int", "Currency", "Percent"):
+				is_multi_currency = is_multi_currency_df(df)
+			if is_multi_currency and (condition := self.prepare_multi_currency_filter_condition(column_name, f)):
+				return condition
+
+			if df and df.fieldtype in ("Check", "Float", "Int", "Currency", "Percent") and not is_multi_currency:
 				can_be_null = False
 
 			if f.operator.lower() in ("previous", "next", "timespan"):
@@ -891,7 +898,7 @@ from {tables}
 				df
 				and (db_type := cstr(frappe.db.type_map.get(df.fieldtype, " ")[0]))
 				and db_type in ("varchar", "text", "longtext", "smalltext", "json")
-			) or f.fieldname in ("owner", "modified_by", "parent", "parentfield", "parenttype"):
+			) or is_multi_currency or f.fieldname in ("owner", "modified_by", "parent", "parentfield", "parenttype"):
 				value = cstr(f.value)
 				fallback = "''"
 
@@ -929,6 +936,35 @@ from {tables}
 				condition = f"ifnull({column_name}, {fallback}) {f.operator} {value}"
 
 		return condition
+
+	def prepare_multi_currency_filter_condition(self, column_name, f):
+		if f.operator.lower() not in ("=", "!=", ">", "<", ">=", "<="):
+			return None
+
+		from frappe.utils.multi_currency import normalize_currency
+
+		try:
+			value = json.loads(f.value) if isinstance(f.value, str) else f.value
+		except ValueError:
+			return None
+		if not isinstance(value, dict):
+			return None
+
+		currency = frappe.db.escape(normalize_currency(value.get("currency")), percent=False)
+		amount = flt(value.get("amount"))
+		if frappe.conf.get("db_type") == "postgres":
+			currency_expr = f"({column_name})::jsonb ->> 'currency'"
+			amount_expr = f"cast(({column_name})::jsonb ->> 'amount' as numeric)"
+		else:
+			currency_expr = f"json_unquote(json_extract({column_name}, '$.currency'))"
+			amount_expr = f"cast(json_unquote(json_extract({column_name}, '$.amount')) as decimal(21,9))"
+
+		if f.operator == "!=":
+			return f"({currency_expr} != {currency} or {amount_expr} != {amount})"
+
+		currency_condition = f"{currency_expr} = {currency}"
+		amount_condition = f"{amount_expr} {f.operator} {amount}"
+		return f"({currency_condition} and {amount_condition})"
 
 	def build_match_conditions(self, as_condition=True) -> str | list:
 		"""add match conditions if applicable"""
