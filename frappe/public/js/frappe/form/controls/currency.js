@@ -25,9 +25,7 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 		this.$currency_menu = $(
 			`<div class="dropdown-menu multi-currency-menu" style="position: absolute; left: 0; top: calc(100% + 2px); z-index: 1000;"></div>`
 		).hide();
-		this.$base_amount_line = $(
-			`<div class="multi-currency-base small text-muted" style="margin-top: 4px;"></div>`
-		);
+		this.ensure_multi_currency_base_amount_line();
 
 		for (const currency of this.get_currency_options()) {
 			this.$currency_menu.append(
@@ -39,7 +37,6 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 		this.$input.before(this.$currency_picker);
 		this.$input.after(this.$currency_menu);
 		this.$input.css("padding-left", "82px");
-		this.$wrapper.find(".control-input-wrapper").append(this.$base_amount_line);
 		this.set_selected_currency(this.get_document_currency(), {
 			update_doc: this.should_initialize_document_currency(),
 		});
@@ -48,9 +45,19 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 		this.$currency_picker.on("click", (event) => {
 			event.preventDefault();
 			event.stopPropagation();
+			if (!this.is_multi_currency_editable()) {
+				this.$currency_menu.hide();
+				return;
+			}
 			this.$currency_menu.toggle();
 		});
 		this.$currency_menu.on("click", "[data-currency]", (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			if (!this.is_multi_currency_editable()) {
+				this.$currency_menu.hide();
+				return;
+			}
 			const currency = $(event.currentTarget).attr("data-currency");
 			this.set_selected_currency(currency, { update_doc: true });
 			this.$currency_menu.hide();
@@ -65,6 +72,18 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 		$("body").on(`click.multi-currency-${this.df.fieldname}`, () => {
 			this.$currency_menu?.hide();
 		});
+		this.refresh_multi_currency_picker_state();
+	}
+
+	ensure_multi_currency_base_amount_line() {
+		if (this.$base_amount_line) {
+			return this.$base_amount_line;
+		}
+		this.$base_amount_line = $(
+			`<div class="multi-currency-base small text-muted" style="margin-top: 4px;"></div>`
+		);
+		this.$wrapper.find(".control-input-wrapper").append(this.$base_amount_line);
+		return this.$base_amount_line;
 	}
 
 	get_currency_options() {
@@ -104,13 +123,39 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 					"xs"
 				)}`
 			);
+		this.refresh_multi_currency_picker_state();
 		if (update_doc && this.frm && this.get_currency_field()) {
-			this.frm.set_value(this.get_currency_field(), normalized_currency);
+			frappe.ui.form.multi_currency.set_document_currency({
+				frm: this.frm,
+				doc: this.doc,
+				doctype: this.doctype,
+				docname: this.docname,
+				currency_field: this.get_currency_field(),
+				currency: normalized_currency,
+			});
 		}
 		if (normalized_currency === "USD") {
 			this.get_usd_cny_rate();
 		}
 		return normalized_currency;
+	}
+
+	is_multi_currency_editable() {
+		return this.disp_status === "Write" && !cint(this.df.read_only);
+	}
+
+	refresh_multi_currency_picker_state() {
+		if (!this.$currency_picker) {
+			return;
+		}
+		const editable = this.is_multi_currency_editable();
+		this.$currency_picker
+			.prop("disabled", !editable)
+			.attr("aria-disabled", editable ? "false" : "true")
+			.toggleClass("disabled", !editable);
+		if (!editable) {
+			this.$currency_menu?.hide();
+		}
 	}
 
 	set_formatted_input(value) {
@@ -126,14 +171,33 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 			amount: parsed.amount,
 			exchange_rate: parsed.exchange_rate,
 		};
-		if (normalized.currency === "USD" && flt(normalized.exchange_rate) > 0) {
+		const document_exchange_rate = frappe.ui.form.multi_currency.get_document_usd_cny_rate(
+			this.doc,
+			this.frm?.doc
+		);
+		if (document_exchange_rate > 0) {
+			this.usd_cny_rate = document_exchange_rate;
+			this.usd_cny_rate_promise = null;
+		} else if (normalized.currency === "USD" && flt(normalized.exchange_rate) > 0) {
 			this.usd_cny_rate = flt(normalized.exchange_rate);
 		}
 		this.set_selected_currency(normalized.currency, {
 			update_doc: this.should_initialize_document_currency(),
 		});
+		this.refresh_multi_currency_picker_state();
 		this.$input.val(this.format_for_input(normalized.amount));
 		this.refresh_multi_currency_state(normalized);
+	}
+
+	set_disp_area(value) {
+		super.set_disp_area(value);
+		if (!this.is_multi_currency()) {
+			return;
+		}
+		if (this.$input && $(this.input_area).is(":visible")) {
+			return;
+		}
+		this.refresh_multi_currency_read_only_state(value);
 	}
 
 	get_input_value() {
@@ -191,22 +255,24 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 		if (!this.is_multi_currency()) {
 			return;
 		}
+		this.ensure_multi_currency_base_amount_line();
+		this.refresh_multi_currency_picker_state();
 		const current = value || this.get_input_value();
 		const currency = this.set_selected_currency(current.currency || this.get_document_currency());
 		const amount = flt(current.amount);
 		const target_currency = frappe.ui.form.multi_currency.get_counter_currency(currency);
 		if (!target_currency) {
-			this.$base_amount_line?.text("");
+			this.$base_amount_line?.text("").removeAttr("title");
 			return;
 		}
 
 		const rate = await this.get_usd_cny_rate();
 		if (!rate) {
-			this.$base_amount_line?.text(__("Missing exchange rate"));
+			this.$base_amount_line?.text(__("Missing exchange rate")).removeAttr("title");
 			return;
 		}
 		if (!amount) {
-			this.$base_amount_line?.text("");
+			this.$base_amount_line?.text("").removeAttr("title");
 			return;
 		}
 		this.$base_amount_line?.text(
@@ -215,6 +281,50 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 				currency,
 				usd_cny_rate: rate,
 				precision: this.get_precision(),
+			})
+		).attr(
+			"title",
+			frappe.ui.form.multi_currency.format_conversion_rate_title({
+				amount,
+				currency,
+				usd_cny_rate: rate,
+			})
+		);
+	}
+
+	async refresh_multi_currency_read_only_state(value) {
+		this.ensure_multi_currency_base_amount_line();
+		const parsed = this.parse_saved_multi_currency_value(value);
+		const currency = parsed.currency || this.get_document_currency();
+		const amount = flt(parsed.amount);
+		const document_exchange_rate = frappe.ui.form.multi_currency.get_document_usd_cny_rate(
+			this.doc,
+			this.frm?.doc
+		);
+		if (document_exchange_rate > 0) {
+			this.usd_cny_rate = document_exchange_rate;
+			this.usd_cny_rate_promise = null;
+		} else if (currency === "USD" && flt(parsed.exchange_rate) > 0) {
+			this.usd_cny_rate = flt(parsed.exchange_rate);
+		}
+		if (!amount) {
+			this.$base_amount_line?.text("").removeAttr("title");
+			return;
+		}
+
+		const rate = await this.get_usd_cny_rate();
+		this.$base_amount_line?.text(
+			frappe.ui.form.multi_currency.format_saved_value_conversion_line(
+				{ ...parsed, currency },
+				rate,
+				this.get_precision()
+			)
+		).attr(
+			"title",
+			frappe.ui.form.multi_currency.format_conversion_rate_title({
+				amount,
+				currency,
+				usd_cny_rate: rate,
 			})
 		);
 	}
@@ -237,6 +347,15 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 	}
 
 	get_usd_cny_rate() {
+		const document_exchange_rate = frappe.ui.form.multi_currency.get_document_usd_cny_rate(
+			this.doc,
+			this.frm?.doc
+		);
+		if (document_exchange_rate > 0) {
+			this.usd_cny_rate = document_exchange_rate;
+			this.usd_cny_rate_promise = null;
+			return Promise.resolve(this.usd_cny_rate);
+		}
 		if (this.usd_cny_rate > 0) {
 			return Promise.resolve(this.usd_cny_rate);
 		}

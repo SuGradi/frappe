@@ -5,15 +5,19 @@ const {
 	calculate_base_amount,
 	convert_between_cny_usd,
 	format_multi_currency_value,
+	format_saved_value_conversion_line,
+	format_conversion_rate_title,
 	get_list_title_value,
 	format_conversion_line,
 	get_counter_currency,
 	get_currency_options,
 	get_multi_currency_input_value,
+	get_document_usd_cny_rate,
 	get_usd_cny_exchange_rate_args,
 	is_multi_currency_df,
 	normalize_multi_currency_value,
 	parse_multi_currency_options,
+	set_document_currency,
 	serialize_multi_currency_filter_value,
 	serialize_multi_currency_value,
 } = require("./multi_currency.js");
@@ -133,14 +137,44 @@ test("convert_between_cny_usd converts both directions with one USD-CNY rate", (
 	assert.equal(convert_between_cny_usd(100, "USD", "CNY", 7.2), 720);
 });
 
-test("format_conversion_line shows converted amount and exchange rate", () => {
+test("format_conversion_line shows converted amount without exchange rate", () => {
 	assert.equal(
 		format_conversion_line({ amount: 100, currency: "USD", usd_cny_rate: 7.2 }),
-		"≈ CNY 720.00 · 汇率 1 USD = 7.2000 CNY"
+		"≈ CNY 720.00"
 	);
 	assert.equal(
 		format_conversion_line({ amount: 720, currency: "CNY", usd_cny_rate: 7.2 }),
-		"≈ USD 100.00 · 汇率 1 USD = 7.2000 CNY"
+		"≈ USD 100.00"
+	);
+});
+
+test("format_conversion_rate_title returns exchange rate for hover title", () => {
+	assert.equal(
+		format_conversion_rate_title({ amount: 100, currency: "USD", usd_cny_rate: 7.2 }),
+		"汇率 1 USD = 7.2000 CNY"
+	);
+	assert.equal(
+		format_conversion_rate_title({ amount: 720, currency: "CNY", usd_cny_rate: 7.2 }),
+		"汇率 1 USD = 7.2000 CNY"
+	);
+});
+
+test("format_saved_value_conversion_line formats readonly saved multi-currency value", () => {
+	assert.equal(
+		format_saved_value_conversion_line(
+			'{"currency":"CNY","amount":666,"exchange_rate":1,"base_currency":"CNY","base_amount":666}',
+			6.796,
+			2
+		),
+		"≈ USD 98.00"
+	);
+	assert.equal(
+		format_saved_value_conversion_line(
+			'{"currency":"USD","amount":98,"exchange_rate":6.796,"base_currency":"CNY","base_amount":666}',
+			0,
+			2
+		),
+		"≈ CNY 666.01"
 	);
 });
 
@@ -149,6 +183,18 @@ test("get_usd_cny_exchange_rate_args does not include document business date", (
 		from_currency: "USD",
 		to_currency: "CNY",
 	});
+});
+
+test("get_document_usd_cny_rate prefers parent form exchange rate for child rows", () => {
+	assert.equal(
+		get_document_usd_cny_rate(
+			{ doctype: "xiaoshou_items", exchange_rate: 6.796 },
+			{ doctype: "xiaoshou", exchange_rate: 6.83 }
+		),
+		6.83
+	);
+	assert.equal(get_document_usd_cny_rate({ doctype: "xiaoshou", exchange_rate: 6.83 }), 6.83);
+	assert.equal(get_document_usd_cny_rate({ doctype: "xiaoshou_items", exchange_rate: 6.796 }), 6.796);
 });
 
 test("get_multi_currency_input_value includes USD-CNY rate for USD amount", () => {
@@ -172,4 +218,60 @@ test("get_multi_currency_input_value defaults blank currency to CNY", () => {
 		amount: "8950",
 		exchange_rate: 1,
 	});
+});
+
+test("set_document_currency updates parent form currency field", () => {
+	const calls = [];
+	const frm = {
+		set_value(fieldname, value) {
+			calls.push([fieldname, value]);
+		},
+	};
+
+	set_document_currency({
+		frm,
+		doc: { doctype: "payment_application", name: "PA-001" },
+		doctype: "payment_application",
+		docname: "PA-001",
+		currency_field: "currency",
+		currency: "USD",
+	});
+
+	assert.deepEqual(calls, [["currency", "USD"]]);
+});
+
+test("set_document_currency updates child row currency field through model", () => {
+	const previous_frappe = globalThis.frappe;
+	const calls = [];
+	globalThis.frappe = {
+		model: {
+			set_value(doctype, docname, fieldname, value) {
+				calls.push([doctype, docname, fieldname, value]);
+			},
+		},
+		ui: { form: { multi_currency: {} } },
+	};
+
+	try {
+		set_document_currency({
+			frm: {
+				set_value() {
+					throw new Error("parent setter should not be used for child rows");
+				},
+			},
+			doc: {
+				doctype: "payment_application_reference",
+				name: "row-1",
+				parentfield: "references",
+			},
+			doctype: "payment_application_reference",
+			docname: "row-1",
+			currency_field: "allocated_currency",
+			currency: "USD",
+		});
+	} finally {
+		globalThis.frappe = previous_frappe;
+	}
+
+	assert.deepEqual(calls, [["payment_application_reference", "row-1", "allocated_currency", "USD"]]);
 });

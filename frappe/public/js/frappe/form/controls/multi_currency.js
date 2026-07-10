@@ -108,11 +108,41 @@
 		if (converted_amount <= 0) {
 			return "";
 		}
-		const rate = to_number(usd_cny_rate).toFixed(4);
 		return `≈ ${target_currency} ${format_money_amount(
 			converted_amount,
 			precision
-		)} · 汇率 1 USD = ${rate} CNY`;
+		)}`;
+	}
+
+	function format_conversion_rate_title({ amount, currency, usd_cny_rate }) {
+		const target_currency = get_counter_currency(currency);
+		const converted_amount = convert_between_cny_usd(
+			amount,
+			currency,
+			target_currency,
+			usd_cny_rate
+		);
+		if (!target_currency || converted_amount <= 0) {
+			return "";
+		}
+		const rate = to_number(usd_cny_rate);
+		return rate > 0 ? `汇率 1 USD = ${rate.toFixed(4)} CNY` : "";
+	}
+
+	function format_saved_value_conversion_line(value, usd_cny_rate, precision = 2) {
+		const parsed = parse_value(value);
+		const currency = normalize_currency(parsed.currency);
+		const amount = to_number(parsed.amount);
+		const rate = to_number(usd_cny_rate || parsed.exchange_rate);
+		if (!amount || rate <= 0) {
+			return "";
+		}
+		return format_conversion_line({
+			amount,
+			currency,
+			usd_cny_rate: rate,
+			precision,
+		});
 	}
 
 	function get_usd_cny_exchange_rate_args() {
@@ -122,6 +152,14 @@
 		};
 	}
 
+	function get_document_usd_cny_rate(doc, parent_doc) {
+		const parent_rate = to_number(parent_doc?.exchange_rate);
+		if (parent_rate > 0) {
+			return parent_rate;
+		}
+		return to_number(doc?.exchange_rate);
+	}
+
 	function get_multi_currency_input_value({ currency, amount, usd_cny_rate }) {
 		const normalized_currency = normalize_currency(currency);
 		return {
@@ -129,6 +167,27 @@
 			amount,
 			exchange_rate: normalized_currency === "USD" ? to_number(usd_cny_rate) : 1,
 		};
+	}
+
+	function set_document_currency({ frm, doc, doctype, docname, currency_field, currency }) {
+		if (!currency_field) {
+			return undefined;
+		}
+
+		const frappe_obj = globalThis?.frappe;
+		if (doc?.parentfield && doctype && docname && frappe_obj?.model?.set_value) {
+			return frappe_obj.model.set_value(doctype, docname, currency_field, currency);
+		}
+
+		if (frm?.set_value) {
+			return frm.set_value(currency_field, currency);
+		}
+
+		if (doc) {
+			doc[currency_field] = currency;
+		}
+
+		return undefined;
 	}
 
 	function calculate_base_amount(amount, currency, exchange_rate, base_currency = BASE_CURRENCY) {
@@ -250,15 +309,19 @@
 		calculate_base_amount,
 		convert_between_cny_usd,
 		format_multi_currency_value,
+		format_saved_value_conversion_line,
+		format_conversion_rate_title,
 		format_conversion_line,
 		get_list_title_value,
 		get_counter_currency,
 		get_currency_options,
 		get_multi_currency_input_value,
+		get_document_usd_cny_rate,
 		get_usd_cny_exchange_rate_args,
 		is_multi_currency_df,
 		normalize_multi_currency_value,
 		parse_multi_currency_options,
+		set_document_currency,
 		serialize_multi_currency_filter_value,
 		serialize_multi_currency_value,
 	};
