@@ -55,18 +55,21 @@
 	}
 
 	function get_currency_options() {
-		return [...SUPPORTED_CURRENCIES];
+		const docs = globalThis?.frappe?.boot?.docs || [];
+		const currencies = docs
+			.filter((doc) => doc?.doctype === ":Currency" && doc?.name)
+			.map((doc) => normalize_currency(doc.name, ""))
+			.filter(Boolean);
+
+		return currencies.length ? [...new Set(currencies)] : [...SUPPORTED_CURRENCIES];
 	}
 
 	function get_counter_currency(currency) {
 		const normalized_currency = normalize_currency(currency);
-		if (normalized_currency === "CNY") {
-			return "USD";
+		if (!normalized_currency) {
+			return "";
 		}
-		if (normalized_currency === "USD") {
-			return "CNY";
-		}
-		return "";
+		return normalized_currency === BASE_CURRENCY ? "USD" : BASE_CURRENCY;
 	}
 
 	function convert_between_cny_usd(amount, from_currency, to_currency, usd_cny_rate) {
@@ -94,17 +97,20 @@
 			});
 	}
 
-	function format_conversion_line({ amount, currency, usd_cny_rate, precision = 2 }) {
+	function format_conversion_line({ amount, currency, exchange_rate, usd_cny_rate, precision = 2 }) {
 		const target_currency = get_counter_currency(currency);
 		if (!target_currency) {
 			return "";
 		}
-		const converted_amount = convert_between_cny_usd(
-			amount,
-			currency,
-			target_currency,
-			usd_cny_rate
-		);
+		const rate = to_number(exchange_rate || usd_cny_rate);
+		if (rate <= 0) {
+			return "";
+		}
+		const normalized_currency = normalize_currency(currency);
+		const converted_amount =
+			normalized_currency === BASE_CURRENCY && target_currency === "USD"
+				? convert_between_cny_usd(amount, BASE_CURRENCY, "USD", rate)
+				: calculate_base_amount(amount, currency, rate, target_currency);
 		if (converted_amount <= 0) {
 			return "";
 		}
@@ -114,19 +120,23 @@
 		)}`;
 	}
 
-	function format_conversion_rate_title({ amount, currency, usd_cny_rate }) {
+	function format_conversion_rate_title({ amount, currency, exchange_rate, usd_cny_rate }) {
 		const target_currency = get_counter_currency(currency);
-		const converted_amount = convert_between_cny_usd(
-			amount,
-			currency,
-			target_currency,
-			usd_cny_rate
-		);
+		const rate = to_number(exchange_rate || usd_cny_rate);
+		if (!target_currency || rate <= 0) {
+			return "";
+		}
+		const normalized_currency = normalize_currency(currency);
+		const converted_amount =
+			normalized_currency === BASE_CURRENCY && target_currency === "USD"
+				? convert_between_cny_usd(amount, BASE_CURRENCY, "USD", rate)
+				: calculate_base_amount(amount, currency, rate, target_currency);
 		if (!target_currency || converted_amount <= 0) {
 			return "";
 		}
-		const rate = to_number(usd_cny_rate);
-		return rate > 0 ? `汇率 1 USD = ${rate.toFixed(4)} CNY` : "";
+		return normalized_currency === BASE_CURRENCY
+			? `汇率 1 USD = ${rate.toFixed(4)} CNY`
+			: `汇率 1 ${normalized_currency} = ${rate.toFixed(4)} CNY`;
 	}
 
 	function format_saved_value_conversion_line(value, usd_cny_rate, precision = 2) {
@@ -145,11 +155,15 @@
 		});
 	}
 
-	function get_usd_cny_exchange_rate_args() {
+	function get_exchange_rate_args(currency) {
 		return {
-			from_currency: "USD",
-			to_currency: "CNY",
+			from_currency: normalize_currency(currency),
+			to_currency: BASE_CURRENCY,
 		};
+	}
+
+	function get_usd_cny_exchange_rate_args() {
+		return get_exchange_rate_args("USD");
 	}
 
 	function get_document_usd_cny_rate(doc, parent_doc) {
@@ -160,13 +174,23 @@
 		return to_number(doc?.exchange_rate);
 	}
 
-	function get_multi_currency_input_value({ currency, amount, usd_cny_rate }) {
+	function get_multi_currency_input_value({ currency, amount, exchange_rate, usd_cny_rate }) {
 		const normalized_currency = normalize_currency(currency);
 		return {
 			currency: normalized_currency,
 			amount,
-			exchange_rate: normalized_currency === "USD" ? to_number(usd_cny_rate) : 1,
+			exchange_rate:
+				normalized_currency === BASE_CURRENCY ? 1 : to_number(exchange_rate || usd_cny_rate),
 		};
+	}
+
+	function should_cache_saved_exchange_rate(currency, exchange_rate) {
+		const normalized_currency = normalize_currency(currency);
+		return (
+			normalized_currency !== BASE_CURRENCY &&
+			Boolean(get_counter_currency(normalized_currency)) &&
+			to_number(exchange_rate) > 0
+		);
 	}
 
 	function set_document_currency({ frm, doc, doctype, docname, currency_field, currency }) {
@@ -188,6 +212,28 @@
 		}
 
 		return undefined;
+	}
+
+	function open_grid_multi_currency_menu(field, activated) {
+		if (
+			!activated
+			|| !field
+			|| typeof field.is_multi_currency !== "function"
+			|| !field.is_multi_currency()
+			|| typeof field.open_multi_currency_menu !== "function"
+		) {
+			return false;
+		}
+		return Boolean(field.open_multi_currency_menu());
+	}
+
+	function should_rebuild_multi_currency_input({
+		has_wrapper,
+		input_inside_wrapper,
+		picker_inside_wrapper,
+		menu_inside_wrapper,
+	} = {}) {
+		return !has_wrapper || !input_inside_wrapper || !picker_inside_wrapper || !menu_inside_wrapper;
 	}
 
 	function calculate_base_amount(amount, currency, exchange_rate, base_currency = BASE_CURRENCY) {
@@ -237,6 +283,13 @@
 			base_currency: normalize_currency(parsed.base_currency, base_currency),
 			base_amount: 0,
 		};
+		if (
+			normalized.currency !== normalized.base_currency &&
+			normalized.amount > 0 &&
+			normalized.exchange_rate <= 0
+		) {
+			return normalized;
+		}
 		normalized.base_amount = calculate_base_amount(
 			normalized.amount,
 			normalized.currency,
@@ -278,21 +331,21 @@
 		const lines = [format_multi_currency_value(value, precision)];
 		const rate = to_number(parsed.exchange_rate || normalized.exchange_rate);
 		if (normalized.amount > 0 && rate > 0) {
-			if (normalized.currency === "USD") {
-				const converted_amount = normalized.base_amount || convert_between_cny_usd(
+			if (normalized.currency !== BASE_CURRENCY) {
+				const converted_amount = normalized.base_amount || calculate_base_amount(
 					normalized.amount,
-					"USD",
-					"CNY",
-					rate
+					normalized.currency,
+					rate,
+					BASE_CURRENCY
 				);
 				if (converted_amount > 0) {
 					lines.push(`换算金额: CNY ${format_money_amount(converted_amount, precision)}`);
-					lines.push(`汇率: 1 USD = ${rate.toFixed(4)} CNY`);
+					lines.push(`汇率: 1 ${normalized.currency} = ${rate.toFixed(4)} CNY`);
 				}
-			} else if (normalized.currency === "CNY" && rate > 1) {
+			} else {
 				const converted_amount = convert_between_cny_usd(
 					normalized.amount,
-					"CNY",
+					BASE_CURRENCY,
 					"USD",
 					rate
 				);
@@ -315,14 +368,18 @@
 		get_list_title_value,
 		get_counter_currency,
 		get_currency_options,
+		get_exchange_rate_args,
 		get_multi_currency_input_value,
 		get_document_usd_cny_rate,
 		get_usd_cny_exchange_rate_args,
 		is_multi_currency_df,
 		normalize_multi_currency_value,
+		open_grid_multi_currency_menu,
 		parse_multi_currency_options,
 		set_document_currency,
+		should_cache_saved_exchange_rate,
 		serialize_multi_currency_filter_value,
 		serialize_multi_currency_value,
+		should_rebuild_multi_currency_input,
 	};
 });

@@ -1041,8 +1041,17 @@ export default class GridRow {
 				horizontal = false;
 			})
 			.on("click", function (event) {
-				if (frappe.ui.form.editable_row !== me) {
+				const activated = frappe.ui.form.editable_row !== me;
+				if (activated) {
 					var out = me.toggle_editable_row();
+				}
+				if (
+					frappe.ui.form.multi_currency?.open_grid_multi_currency_menu(
+						$col.field,
+						activated
+					)
+				) {
+					return out;
 				}
 				var col = this;
 				let first_input_field = $(col).find('input[type="Text"]:first');
@@ -1173,6 +1182,9 @@ export default class GridRow {
 		};
 
 		field.refresh();
+		if (field.is_multi_currency && field.is_multi_currency() && field.setup_multi_currency_input) {
+			field.setup_multi_currency_input();
+		}
 		if (field.$input) {
 			field.$input
 				.addClass("input-sm")

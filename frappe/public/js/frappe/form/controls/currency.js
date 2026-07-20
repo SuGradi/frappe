@@ -7,20 +7,47 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 		this.setup_multi_currency_input();
 	}
 
+	refresh_input() {
+		super.refresh_input();
+		if (!this.is_multi_currency() || !this.$input || !$(this.input_area).is(":visible")) {
+			return;
+		}
+		this.setup_multi_currency_input();
+	}
+
 	is_multi_currency() {
 		return frappe.ui.form.multi_currency?.is_multi_currency_df(this.df);
 	}
 
 	setup_multi_currency_input() {
-		if (this.$multi_currency_row) {
+		const should_rebuild = frappe.ui.form.multi_currency.should_rebuild_multi_currency_input({
+			has_wrapper: Boolean(this.$multi_currency_row?.length),
+			input_inside_wrapper: Boolean(
+				this.$input?.length
+					&& this.$multi_currency_row?.length
+					&& this.$input.closest(this.$multi_currency_row).length
+			),
+			picker_inside_wrapper: Boolean(
+				this.$currency_picker?.length
+					&& this.$multi_currency_row?.length
+					&& this.$currency_picker.closest(this.$multi_currency_row).length
+			),
+			menu_inside_wrapper: Boolean(
+				this.$currency_menu?.length
+					&& this.$multi_currency_row?.length
+					&& this.$currency_menu.closest(this.$multi_currency_row).length
+			),
+		});
+		if (!should_rebuild) {
 			return;
 		}
 
+		this.reset_multi_currency_input_shell();
 		this.$multi_currency_row = $(
 			`<div class="multi-currency-control" style="position: relative;"></div>`
 		);
 		this.$currency_picker = $(
-			`<button type="button" class="btn btn-default btn-xs multi-currency-picker" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); z-index: 2; min-width: 64px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;"></button>`
+			`<button type="button" class="btn btn-default btn-xs multi-currency-picker" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); z-index: 4; min-width: 64px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;"></button>`
 		);
 		this.$currency_menu = $(
 			`<div class="dropdown-menu multi-currency-menu" style="position: absolute; left: 0; top: calc(100% + 2px); z-index: 1000;"></div>`
@@ -42,7 +69,7 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 		});
 
 		const refresh_conversion_line = frappe.utils.debounce(() => this.refresh_multi_currency_state(), 300);
-		this.$currency_picker.on("click", (event) => {
+		this.$currency_picker.on("click.multi-currency-control", (event) => {
 			event.preventDefault();
 			event.stopPropagation();
 			if (!this.is_multi_currency_editable()) {
@@ -51,7 +78,7 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 			}
 			this.$currency_menu.toggle();
 		});
-		this.$currency_menu.on("click", "[data-currency]", (event) => {
+		this.$currency_menu.on("click.multi-currency-control", "[data-currency]", (event) => {
 			event.preventDefault();
 			event.stopPropagation();
 			if (!this.is_multi_currency_editable()) {
@@ -65,24 +92,58 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 				this.parse_validate_and_set_in_model(this.get_input_value());
 			});
 		});
-		this.$input.on("input", () => {
+		this.$input.off(".multi-currency-control");
+		this.$input.on("input.multi-currency-control", () => {
 			this.frm?.dirty?.();
 			refresh_conversion_line();
 		});
+		$("body").off(`click.multi-currency-${this.df.fieldname}`);
 		$("body").on(`click.multi-currency-${this.df.fieldname}`, () => {
 			this.$currency_menu?.hide();
 		});
 		this.refresh_multi_currency_picker_state();
 	}
 
+	reset_multi_currency_input_shell() {
+		this.$currency_picker?.remove();
+		this.$currency_menu?.remove();
+
+		if (this.$multi_currency_row?.length) {
+			if (this.$input?.length && this.$input.closest(this.$multi_currency_row).length) {
+				this.$input.css("padding-left", "");
+				this.$input.unwrap(".multi-currency-control");
+			} else {
+				this.$multi_currency_row.remove();
+			}
+		}
+
+		this.$multi_currency_row = null;
+		this.$currency_picker = null;
+		this.$currency_menu = null;
+	}
+
+	open_multi_currency_menu() {
+		if (!this.is_multi_currency_editable() || !this.$currency_menu?.length) {
+			return false;
+		}
+		this.$currency_menu.show();
+		return true;
+	}
+
 	ensure_multi_currency_base_amount_line() {
-		if (this.$base_amount_line) {
+		const $input_wrapper = this.$wrapper.find(".control-input-wrapper");
+		if (
+			this.$base_amount_line?.length
+			&& $input_wrapper.length
+			&& this.$base_amount_line.closest($input_wrapper).length
+		) {
 			return this.$base_amount_line;
 		}
+		this.$base_amount_line?.remove();
 		this.$base_amount_line = $(
 			`<div class="multi-currency-base small text-muted" style="margin-top: 4px;"></div>`
 		);
-		this.$wrapper.find(".control-input-wrapper").append(this.$base_amount_line);
+		$input_wrapper.append(this.$base_amount_line);
 		return this.$base_amount_line;
 	}
 
@@ -113,6 +174,7 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 	}
 
 	set_selected_currency(currency, { update_doc = false } = {}) {
+		const previous_currency = this.get_selected_currency();
 		const normalized_currency = this.get_currency_options().includes(currency) ? currency : "";
 		const label = normalized_currency || __("币种");
 		this.$currency_picker
@@ -125,6 +187,9 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 			);
 		this.refresh_multi_currency_picker_state();
 		if (update_doc && this.frm && this.get_currency_field()) {
+			if (normalized_currency && normalized_currency !== previous_currency) {
+				this.clear_cached_exchange_rate(normalized_currency);
+			}
 			frappe.ui.form.multi_currency.set_document_currency({
 				frm: this.frm,
 				doc: this.doc,
@@ -134,8 +199,8 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 				currency: normalized_currency,
 			});
 		}
-		if (normalized_currency === "USD") {
-			this.get_usd_cny_rate();
+		if (frappe.ui.form.multi_currency.get_counter_currency(normalized_currency)) {
+			this.get_exchange_rate(normalized_currency);
 		}
 		return normalized_currency;
 	}
@@ -171,15 +236,11 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 			amount: parsed.amount,
 			exchange_rate: parsed.exchange_rate,
 		};
-		const document_exchange_rate = frappe.ui.form.multi_currency.get_document_usd_cny_rate(
-			this.doc,
-			this.frm?.doc
-		);
-		if (document_exchange_rate > 0) {
-			this.usd_cny_rate = document_exchange_rate;
-			this.usd_cny_rate_promise = null;
-		} else if (normalized.currency === "USD" && flt(normalized.exchange_rate) > 0) {
-			this.usd_cny_rate = flt(normalized.exchange_rate);
+		if (
+			normalized.currency === "USD" &&
+			flt(normalized.exchange_rate) > 0
+		) {
+			this.set_cached_exchange_rate(normalized.currency, normalized.exchange_rate);
 		}
 		this.set_selected_currency(normalized.currency, {
 			update_doc: this.should_initialize_document_currency(),
@@ -207,7 +268,7 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 		return frappe.ui.form.multi_currency.get_multi_currency_input_value({
 			currency: this.get_selected_currency(),
 			amount: this.$input?.val(),
-			usd_cny_rate: this.usd_cny_rate || 0,
+			exchange_rate: this.get_cached_exchange_rate(this.get_selected_currency()),
 		});
 	}
 
@@ -244,8 +305,12 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 
 	async get_parsed_multi_currency_input(value) {
 		const input_value = value || this.get_input_value();
-		if (input_value.currency === "USD" && flt(input_value.amount) > 0 && !flt(input_value.exchange_rate)) {
-			const rate = await this.get_usd_cny_rate();
+		if (
+			frappe.ui.form.multi_currency.get_counter_currency(input_value.currency) &&
+			flt(input_value.amount) > 0 &&
+			!flt(input_value.exchange_rate)
+		) {
+			const rate = await this.get_exchange_rate(input_value.currency);
 			input_value.exchange_rate = rate;
 		}
 		return this.parse(input_value);
@@ -266,7 +331,7 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 			return;
 		}
 
-		const rate = await this.get_usd_cny_rate();
+		const rate = await this.get_exchange_rate(currency);
 		if (!rate) {
 			this.$base_amount_line?.text(__("Missing exchange rate")).removeAttr("title");
 			return;
@@ -279,7 +344,7 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 			frappe.ui.form.multi_currency.format_conversion_line({
 				amount,
 				currency,
-				usd_cny_rate: rate,
+				exchange_rate: rate,
 				precision: this.get_precision(),
 			})
 		).attr(
@@ -287,7 +352,7 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 			frappe.ui.form.multi_currency.format_conversion_rate_title({
 				amount,
 				currency,
-				usd_cny_rate: rate,
+				exchange_rate: rate,
 			})
 		);
 	}
@@ -297,22 +362,24 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 		const parsed = this.parse_saved_multi_currency_value(value);
 		const currency = parsed.currency || this.get_document_currency();
 		const amount = flt(parsed.amount);
-		const document_exchange_rate = frappe.ui.form.multi_currency.get_document_usd_cny_rate(
-			this.doc,
-			this.frm?.doc
-		);
-		if (document_exchange_rate > 0) {
-			this.usd_cny_rate = document_exchange_rate;
-			this.usd_cny_rate_promise = null;
-		} else if (currency === "USD" && flt(parsed.exchange_rate) > 0) {
-			this.usd_cny_rate = flt(parsed.exchange_rate);
+		if (
+			frappe.ui.form.multi_currency.should_cache_saved_exchange_rate(
+				currency,
+				parsed.exchange_rate
+			)
+		) {
+			this.set_cached_exchange_rate(currency, parsed.exchange_rate);
 		}
 		if (!amount) {
 			this.$base_amount_line?.text("").removeAttr("title");
 			return;
 		}
+		if (!frappe.ui.form.multi_currency.get_counter_currency(currency)) {
+			this.$base_amount_line?.text("").removeAttr("title");
+			return;
+		}
 
-		const rate = await this.get_usd_cny_rate();
+		const rate = await this.get_exchange_rate(currency);
 		this.$base_amount_line?.text(
 			frappe.ui.form.multi_currency.format_saved_value_conversion_line(
 				{ ...parsed, currency },
@@ -324,7 +391,7 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 			frappe.ui.form.multi_currency.format_conversion_rate_title({
 				amount,
 				currency,
-				usd_cny_rate: rate,
+				exchange_rate: rate,
 			})
 		);
 	}
@@ -346,41 +413,91 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 		return { amount: value, currency: "CNY" };
 	}
 
-	get_usd_cny_rate() {
-		const document_exchange_rate = frappe.ui.form.multi_currency.get_document_usd_cny_rate(
-			this.doc,
-			this.frm?.doc
-		);
+	normalize_exchange_currency(currency) {
+		const normalized_currency = frappe.ui.form.multi_currency.get_exchange_rate_args(currency).from_currency;
+		return normalized_currency === "CNY" ? "USD" : normalized_currency;
+	}
+
+	get_cached_exchange_rate(currency) {
+		const normalized_currency = this.normalize_exchange_currency(currency);
+		if (!frappe.ui.form.multi_currency.get_counter_currency(normalized_currency)) {
+			return 1;
+		}
+		return flt(this.exchange_rates?.[normalized_currency]);
+	}
+
+	set_cached_exchange_rate(currency, rate) {
+		const normalized_currency = this.normalize_exchange_currency(currency);
+		if (!frappe.ui.form.multi_currency.get_counter_currency(normalized_currency)) {
+			return 1;
+		}
+		this.exchange_rates = this.exchange_rates || {};
+		this.exchange_rates[normalized_currency] = flt(rate);
+		return this.exchange_rates[normalized_currency];
+	}
+
+	clear_cached_exchange_rate(currency) {
+		const normalized_currency = this.normalize_exchange_currency(currency);
+		if (this.exchange_rates) {
+			delete this.exchange_rates[normalized_currency];
+		}
+		if (this.exchange_rate_promises) {
+			delete this.exchange_rate_promises[normalized_currency];
+		}
+	}
+
+	get_exchange_rate(currency) {
+		const normalized_currency = this.normalize_exchange_currency(currency);
+		if (!frappe.ui.form.multi_currency.get_counter_currency(normalized_currency)) {
+			return Promise.resolve(1);
+		}
+		const document_exchange_rate = this.get_document_exchange_rate(normalized_currency);
 		if (document_exchange_rate > 0) {
-			this.usd_cny_rate = document_exchange_rate;
-			this.usd_cny_rate_promise = null;
-			return Promise.resolve(this.usd_cny_rate);
+			this.set_cached_exchange_rate(normalized_currency, document_exchange_rate);
+			return Promise.resolve(document_exchange_rate);
 		}
-		if (this.usd_cny_rate > 0) {
-			return Promise.resolve(this.usd_cny_rate);
+		const cached_rate = this.get_cached_exchange_rate(normalized_currency);
+		if (cached_rate > 0) {
+			return Promise.resolve(cached_rate);
 		}
-		if (this.usd_cny_rate_promise) {
-			return this.usd_cny_rate_promise;
+		this.exchange_rate_promises = this.exchange_rate_promises || {};
+		if (this.exchange_rate_promises[normalized_currency]) {
+			return this.exchange_rate_promises[normalized_currency];
 		}
 
-		this.usd_cny_rate_promise = new Promise((resolve) => {
+		this.exchange_rate_promises[normalized_currency] = new Promise((resolve) => {
 			frappe.call({
 				method: "erpnext.setup.utils.get_exchange_rate",
-				args: frappe.ui.form.multi_currency.get_usd_cny_exchange_rate_args(this.doc),
+				args: frappe.ui.form.multi_currency.get_exchange_rate_args(normalized_currency),
 				callback: (response) => {
-					this.usd_cny_rate = flt(response.message);
-					if (!this.usd_cny_rate) {
-						this.usd_cny_rate_promise = null;
+					const rate = this.set_cached_exchange_rate(normalized_currency, response.message);
+					if (!rate) {
+						this.exchange_rate_promises[normalized_currency] = null;
 					}
-					resolve(this.usd_cny_rate);
+					resolve(rate);
 				},
 				error: () => {
-					this.usd_cny_rate_promise = null;
+					this.exchange_rate_promises[normalized_currency] = null;
 					resolve(0);
 				},
 			});
 		});
-		return this.usd_cny_rate_promise;
+		return this.exchange_rate_promises[normalized_currency];
+	}
+
+	get_document_exchange_rate(currency) {
+		const normalized_currency = this.normalize_exchange_currency(currency);
+		if (normalized_currency !== "USD") {
+			return 0;
+		}
+		return frappe.ui.form.multi_currency.get_document_usd_cny_rate(
+			this.doc,
+			this.frm?.doc
+		);
+	}
+
+	get_usd_cny_rate() {
+		return this.get_exchange_rate("USD");
 	}
 
 	get_precision() {
