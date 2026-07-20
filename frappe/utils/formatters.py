@@ -77,6 +77,14 @@ def format_value(value, df=None, doc=None, currency=None, translated=False, form
 		return ""
 
 	elif df.get("fieldtype") == "Currency":
+		from frappe.utils.multi_currency import is_multi_currency_df, parse_multi_currency_value
+
+		if is_multi_currency_df(df):
+			money = parse_multi_currency_value(value)
+			return fmt_money(
+				money.amount, precision=get_field_precision(df, doc), currency=money.currency, format=format
+			)
+
 		default_currency = frappe.db.get_default("currency")
 		currency = currency or get_field_currency(df, doc) or default_currency
 		return fmt_money(value, precision=get_field_precision(df, doc), currency=currency, format=format)

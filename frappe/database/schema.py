@@ -185,7 +185,9 @@ class DbColumn:
 		self.precision = precision
 
 	def get_definition(self, for_modification=False):
-		column_def = get_definition(self.fieldtype, precision=self.precision, length=self.length)
+		column_def = get_definition(
+			self.fieldtype, precision=self.precision, length=self.length, options=self.options
+		)
 
 		if not column_def:
 			return column_def
@@ -194,7 +196,9 @@ class DbColumn:
 			default_value = cint(self.default) or 0
 			column_def += f" not null default {default_value}"
 
-		elif self.fieldtype in ("Currency", "Float", "Percent"):
+		elif self.fieldtype in ("Currency", "Float", "Percent") and not is_multi_currency_field(
+			self.fieldtype, self.options
+		):
 			default_value = flt(self.default) or 0
 			column_def += f" not null default {default_value}"
 
@@ -211,7 +215,7 @@ class DbColumn:
 		return column_def
 
 	def build_for_alter_table(self, current_def):
-		column_type = get_definition(self.fieldtype, self.precision, self.length)
+		column_type = get_definition(self.fieldtype, self.precision, self.length, self.options)
 
 		# no columns
 		if not column_type:
@@ -271,7 +275,9 @@ class DbColumn:
 			if fieldtype in ["Int", "Check"]:
 				cur_default = cint(cur_default)
 				new_default = cint(new_default)
-			elif fieldtype in ["Currency", "Float", "Percent"]:
+			elif fieldtype in ["Currency", "Float", "Percent"] and not is_multi_currency_field(
+				self.fieldtype, self.options
+			):
 				cur_default = flt(cur_default)
 				new_default = flt(new_default)
 			return cur_default != new_default
@@ -318,7 +324,10 @@ def validate_column_length(fieldname):
 		frappe.throw(_("Fieldname is limited to 64 characters ({0})").format(fieldname))
 
 
-def get_definition(fieldtype, precision=None, length=None):
+def get_definition(fieldtype, precision=None, length=None, options=None):
+	if is_multi_currency_field(fieldtype, options):
+		return get_definition("Text", length=length)
+
 	d = frappe.db.type_map.get(fieldtype)
 
 	if not d:
@@ -350,6 +359,13 @@ def get_definition(fieldtype, precision=None, length=None):
 		coltype = f"{coltype}({size})"
 
 	return coltype
+
+
+def is_multi_currency_field(fieldtype, options=None):
+	options = cstr(options).strip()
+	return fieldtype == "Currency" and (
+		options == "Multi Currency" or options.startswith("Multi Currency:")
+	)
 
 
 def add_column(doctype, column_name, fieldtype, precision=None, length=None, default=None, not_null=False):

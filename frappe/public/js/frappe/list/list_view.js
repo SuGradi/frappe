@@ -851,6 +851,13 @@ frappe.views.ListView = class ListView extends frappe.views.BaseList {
 				_value = _value * out_of_ratings;
 			}
 
+			if (frappe.ui?.form?.multi_currency?.is_multi_currency_df(df)) {
+				_value = frappe.ui.form.multi_currency.get_list_title_value(
+					value,
+					cint(df.precision || frappe.boot.sysdefaults.currency_precision || 2)
+				);
+			}
+
 			if (df.fieldtype === "Image") {
 				html = df.options
 					? `<img src="${doc[df.options]}"

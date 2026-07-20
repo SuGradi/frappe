@@ -1,6 +1,6 @@
 import frappe
 from frappe import _
-from frappe.database.schema import DBTable, get_definition
+from frappe.database.schema import DBTable, get_definition, is_multi_currency_field
 from frappe.utils import cint, flt
 
 
@@ -85,7 +85,12 @@ class PostgresTable(DBTable):
 			query.append(
 				"ALTER COLUMN `{}` TYPE {} {}".format(
 					col.fieldname,
-					get_definition(col.fieldtype, precision=col.precision, length=col.length),
+					get_definition(
+						col.fieldtype,
+						precision=col.precision,
+						length=col.length,
+						options=col.options,
+					),
 					using_clause,
 				)
 			)
@@ -97,7 +102,9 @@ class PostgresTable(DBTable):
 			if col.fieldtype in ("Check", "Int"):
 				col_default = cint(col.default)
 
-			elif col.fieldtype in ("Currency", "Float", "Percent"):
+			elif col.fieldtype in ("Currency", "Float", "Percent") and not is_multi_currency_field(
+				col.fieldtype, col.options
+			):
 				col_default = flt(col.default)
 
 			elif not col.default:

@@ -125,6 +125,16 @@ frappe.form.formatters = {
 			return "";
 		}
 
+		if (frappe.ui?.form?.multi_currency?.is_multi_currency_df(docfield)) {
+			value = frappe.ui.form.multi_currency.format_multi_currency_value(
+				value,
+				cint(docfield.precision || frappe.boot.sysdefaults.currency_precision || 2)
+			);
+			return options && options.only_value
+				? value
+				: frappe.form.formatters._right(value, options);
+		}
+
 		var currency = frappe.meta.get_field_currency(docfield, doc);
 
 		let precision;
