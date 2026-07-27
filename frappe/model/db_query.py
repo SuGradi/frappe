@@ -813,6 +813,15 @@ from {tables}
 			if is_multi_currency and (condition := self.prepare_multi_currency_filter_condition(column_name, f)):
 				return condition
 
+			if (
+				frappe.conf.get("db_type") == "postgres"
+				and df
+				and df.fieldtype in ("Check", "Currency", "Duration", "Float", "Int", "Percent")
+				and not is_multi_currency
+				and f.operator.lower() in ("like", "not like")
+			):
+				column_name = f"cast({column_name} as text)"
+
 			if df and df.fieldtype in ("Check", "Float", "Int", "Currency", "Percent") and not is_multi_currency:
 				can_be_null = False
 

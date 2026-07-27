@@ -1212,6 +1212,44 @@ class TestDBQuery(FrappeTestCase):
 		self.assertNotIn("ifnull", query)
 
 
+class TestNumericFilterSQL(FrappeTestCase):
+	def test_postgres_numeric_like_casts_column_to_text(self):
+		numeric_fields = (
+			("DocType", "issingle"),
+			("Currency", "smallest_currency_fraction_value"),
+			("RQ Job", "timeout"),
+			("Recorder", "duration"),
+			("DocType", "max_attachments"),
+			("RQ Worker", "utilization_percent"),
+		)
+
+		with patch.dict(frappe.conf, {"db_type": "postgres"}):
+			for doctype, fieldname in numeric_fields:
+				for operator in ("like", "not like"):
+					with self.subTest(doctype=doctype, fieldname=fieldname, operator=operator):
+						condition = DatabaseQuery(doctype).prepare_filter_condition(
+							[doctype, fieldname, operator, "%10%"]
+						)
+						expected_operator = "ilike" if operator == "like" else "not like"
+						self.assertRegex(condition, rf"cast\(.* as text\).* {expected_operator} ")
+
+	def test_postgres_numeric_equality_does_not_cast_column(self):
+		with patch.dict(frappe.conf, {"db_type": "postgres"}):
+			condition = DatabaseQuery("DocType").prepare_filter_condition(
+				["DocType", "issingle", "=", "1"]
+			)
+
+		self.assertNotIn("cast(", condition)
+
+	def test_mariadb_numeric_like_does_not_cast_column(self):
+		with patch.dict(frappe.conf, {"db_type": "mariadb"}):
+			condition = DatabaseQuery("DocType").prepare_filter_condition(
+				["DocType", "issingle", "like", "%1%"]
+			)
+
+		self.assertNotIn("cast(", condition)
+
+
 class TestReportView(FrappeTestCase):
 	@run_only_if(db_type_is.MARIADB)  # TODO: postgres name casting is messed up
 	def test_get_count(self):
