@@ -7,50 +7,109 @@
 	root.frappe.views = root.frappe.views || {};
 	root.frappe.views.report_inline_filters = api;
 })(typeof window !== "undefined" ? window : globalThis, function () {
-	const exact_match_fieldtypes = new Set([
+	const numeric_fieldtypes = new Set([
 		"Check",
 		"Currency",
-		"Date",
-		"Datetime",
 		"Duration",
 		"Float",
 		"Int",
 		"Percent",
-		"Time",
 	]);
+
+	function is_numeric_value(value) {
+		return /^-?\d+(?:\.\d+)?$/.test(value);
+	}
+
+	function is_iso_date(value) {
+		const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+		if (!match) return false;
+
+		const [, year, month, day] = match.map(Number);
+		const date = new Date(Date.UTC(year, month - 1, day));
+		return (
+			date.getUTCFullYear() === year &&
+			date.getUTCMonth() === month - 1 &&
+			date.getUTCDate() === day
+		);
+	}
+
+	function is_time(value) {
+		const match = /^(\d{1,2}):(\d{2})(?::(\d{2})(?:\.(\d{1,6}))?)?$/.exec(value);
+		if (!match) return false;
+
+		const [, hour, minute, second = "0"] = match;
+		return Number(hour) <= 23 && Number(minute) <= 59 && Number(second) <= 59;
+	}
+
+	function is_datetime(value) {
+		const [date, time, extra] = value.split(/[ T]/);
+		return !extra && Boolean(time) && is_iso_date(date) && is_time(time);
+	}
+
+	function is_multi_currency(docfield) {
+		const options = String(docfield.options || "").trim();
+		return (
+			docfield.fieldtype === "Currency" &&
+			(options === "Multi Currency" || options.startsWith("Multi Currency:"))
+		);
+	}
+
+	function is_valid_operand(value, docfield) {
+		if (is_multi_currency(docfield)) return false;
+		if (numeric_fieldtypes.has(docfield.fieldtype)) return is_numeric_value(value);
+		if (docfield.fieldtype === "Date") return is_iso_date(value);
+		if (docfield.fieldtype === "Datetime") return is_iso_date(value) || is_datetime(value);
+		if (docfield.fieldtype === "Time") return is_time(value);
+		return true;
+	}
 
 	function parse_inline_filter_expression(input, docfield = {}) {
 		const text = String(input ?? "").trim();
 		if (!text) return null;
 
+		if (docfield.fieldtype === "Time" && is_time(text)) {
+			return ["=", text];
+		}
+
 		const range = text.split(":").map((value) => value.trim());
-		const is_range_value = (value) =>
-			/^-?\d+(?:\.\d+)?$/.test(value) || /^\d{4}-\d{2}-\d{2}$/.test(value);
-		if (range.length === 2 && range.every(is_range_value)) {
+		const is_valid_range =
+			!is_multi_currency(docfield) &&
+			range.length === 2 &&
+			(numeric_fieldtypes.has(docfield.fieldtype)
+				? range.every(is_numeric_value)
+				: ["Date", "Datetime"].includes(docfield.fieldtype)
+				? range.every(is_iso_date)
+				: docfield.fieldtype !== "Time" &&
+				  range.every((value) => is_numeric_value(value) || is_iso_date(value)));
+		if (is_valid_range) {
 			return ["between", range];
 		}
 
 		for (const operator of ["!=", ">", "<", "="]) {
 			if (text.startsWith(operator)) {
 				const value = text.slice(operator.length).trim();
-				return value ? [operator, value] : null;
+				return value && is_valid_operand(value, docfield) ? [operator, value] : null;
 			}
 		}
 
-		const options = String(docfield.options || "").trim();
-		if (
-			docfield.fieldtype === "Currency" &&
-			(options === "Multi Currency" || options.startsWith("Multi Currency:"))
-		) {
+		if (is_multi_currency(docfield)) {
 			return ["like", `%${text}%`];
 		}
 
-		if (docfield.fieldtype === "Datetime" && /^\d{4}-\d{2}-\d{2}$/.test(text)) {
+		if (docfield.fieldtype === "Date") {
+			return is_iso_date(text) ? ["=", text] : null;
+		}
+
+		if (docfield.fieldtype === "Datetime" && is_iso_date(text)) {
 			return ["between", [text, text]];
 		}
 
-		if (exact_match_fieldtypes.has(docfield.fieldtype)) {
-			return ["=", text];
+		if (docfield.fieldtype === "Datetime") {
+			return is_datetime(text) ? ["=", text] : null;
+		}
+
+		if (docfield.fieldtype === "Time") {
+			return null;
 		}
 
 		return ["like", `%${text}%`];

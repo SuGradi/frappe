@@ -45,10 +45,28 @@ test("date and numeric columns use field-valid equality filters", () => {
 		"=",
 		"2026-07-27",
 	]);
-	assert.deepEqual(parse_inline_filter_expression("10", { fieldtype: "Currency" }), ["=", "10"]);
+	assert.deepEqual(parse_inline_filter_expression("10", { fieldtype: "Currency" }), [
+		"like",
+		"%10%",
+	]);
+	assert.deepEqual(parse_inline_filter_expression("=10", { fieldtype: "Currency" }), [
+		"=",
+		"10",
+	]);
 	assert.deepEqual(parse_inline_filter_expression("10", { fieldtype: "Data" }), [
 		"like",
 		"%10%",
+	]);
+});
+
+test("date and time columns reject values the backend cannot validate", () => {
+	assert.equal(parse_inline_filter_expression("2026-07", { fieldtype: "Date" }), null);
+	assert.equal(parse_inline_filter_expression("2026-02-30", { fieldtype: "Date" }), null);
+	assert.equal(parse_inline_filter_expression(">foo", { fieldtype: "Date" }), null);
+	assert.equal(parse_inline_filter_expression("25:00", { fieldtype: "Time" }), null);
+	assert.deepEqual(parse_inline_filter_expression("09:30", { fieldtype: "Time" }), [
+		"=",
+		"09:30",
 	]);
 });
 
@@ -173,6 +191,10 @@ test("Report View wires inline inputs to server-side filters", () => {
 	);
 	assert.match(report_view_source, /this\.start = 0;[\s\S]*?this\.refresh\(\)/);
 	assert.match(report_view_source, /has_inline_filters\(\)/);
+	assert.match(
+		report_view_source,
+		/build_column\([^)]*\)[\s\S]*?frappe\.perm\.has_perm\(this\.doctype/
+	);
 	assert.doesNotMatch(report_view_source, /^\s*refresh\([^)]*\)\s*{/m);
 	assert.match(
 		report_view_source,

@@ -1272,7 +1272,13 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 				}
 			}
 		}
-		if (!docfield || docfield.report_hide) return;
+		if (
+			!docfield ||
+			docfield.report_hide ||
+			!frappe.perm.has_perm(this.doctype, docfield.permlevel, "read")
+		) {
+			return;
+		}
 
 		let title = __(docfield.label, null, docfield.parent);
 		if (doctype !== this.doctype) {
