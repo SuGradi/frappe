@@ -53,6 +53,10 @@ test("date and numeric columns use field-valid equality filters", () => {
 		"=",
 		"10",
 	]);
+	for (const fieldtype of ["Long Int", "Rating"]) {
+		assert.deepEqual(parse_inline_filter_expression(">10", { fieldtype }), [">", "10"]);
+		assert.equal(parse_inline_filter_expression(">invalid", { fieldtype }), null);
+	}
 	assert.deepEqual(parse_inline_filter_expression("10", { fieldtype: "Data" }), [
 		"like",
 		"%10%",
@@ -68,6 +72,11 @@ test("date and time columns reject values the backend cannot validate", () => {
 		"=",
 		"09:30",
 	]);
+	assert.deepEqual(parse_inline_filter_expression("status:open", { fieldtype: "JSON" }), [
+		"like",
+		"%status:open%",
+	]);
+	assert.equal(parse_inline_filter_expression(">open", { fieldtype: "JSON" }), null);
 });
 
 test("datetime dates cover the full day and multi-currency values search stored JSON", () => {

@@ -1243,6 +1243,25 @@ class TestNumericFilterSQL(FrappeTestCase):
 
 		self.assertNotIn("cast(", condition)
 
+	def test_postgres_non_text_like_casts_column_to_text(self):
+		for fieldtype in ("Long Int", "Rating", "JSON"):
+			with self.subTest(fieldtype=fieldtype):
+				df = frappe._dict(fieldname="value", fieldtype=fieldtype)
+				meta = MagicMock()
+				meta.get.return_value = [df]
+				meta.get_field.return_value = df
+				meta.has_field.return_value = True
+
+				with (
+					patch.dict(frappe.conf, {"db_type": "postgres"}),
+					patch("frappe.get_meta", return_value=meta),
+				):
+					condition = DatabaseQuery("Test Filter Field").prepare_filter_condition(
+						["Test Filter Field", "value", "like", "%10%"]
+					)
+
+				self.assertRegex(condition, r"cast\(.* as text\).* ilike ")
+
 	def test_mariadb_numeric_like_does_not_cast_column(self):
 		with patch.dict(frappe.conf, {"db_type": "mariadb"}):
 			condition = DatabaseQuery("DocType").prepare_filter_condition(

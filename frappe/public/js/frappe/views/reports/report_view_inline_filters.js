@@ -13,7 +13,9 @@
 		"Duration",
 		"Float",
 		"Int",
+		"Long Int",
 		"Percent",
+		"Rating",
 	]);
 
 	function is_numeric_value(value) {
@@ -56,6 +58,7 @@
 
 	function is_valid_operand(value, docfield) {
 		if (is_multi_currency(docfield)) return false;
+		if (docfield.fieldtype === "JSON") return false;
 		if (numeric_fieldtypes.has(docfield.fieldtype)) return is_numeric_value(value);
 		if (docfield.fieldtype === "Date") return is_iso_date(value);
 		if (docfield.fieldtype === "Datetime") return is_iso_date(value) || is_datetime(value);
@@ -74,6 +77,7 @@
 		const range = text.split(":").map((value) => value.trim());
 		const is_valid_range =
 			!is_multi_currency(docfield) &&
+			docfield.fieldtype !== "JSON" &&
 			range.length === 2 &&
 			(numeric_fieldtypes.has(docfield.fieldtype)
 				? range.every(is_numeric_value)
