@@ -1,4 +1,18 @@
 frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.ControlFloat {
+	bind_change_event() {
+		if (!this.is_multi_currency()) {
+			return super.bind_change_event();
+		}
+
+		const change_handler = (e) => {
+			if (this.change) this.change(e);
+			else {
+				this.parse_validate_and_set_in_model(this.get_input_value(), e);
+			}
+		};
+		this.$input.on("change", change_handler);
+	}
+
 	make_input() {
 		super.make_input();
 		if (!this.is_multi_currency()) {
@@ -47,7 +61,7 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 			`<div class="multi-currency-control" style="position: relative;"></div>`
 		);
 		this.$currency_picker = $(
-			`<button type="button" class="btn btn-default btn-xs multi-currency-picker" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); z-index: 4; min-width: 64px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;"></button>`
+			`<button type="button" class="btn btn-default btn-xs multi-currency-picker" style="position: absolute; left: 6px; top: 50%; transform: translateY(-50%); min-width: 64px; display: inline-flex; align-items: center; justify-content: center; gap: 4px;"></button>`
 		);
 		this.$currency_menu = $(
 			`<div class="dropdown-menu multi-currency-menu" style="position: absolute; left: 0; top: calc(100% + 2px); z-index: 1000;"></div>`
@@ -61,14 +75,13 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 		}
 
 		this.$input.wrap(this.$multi_currency_row);
-		this.$input.before(this.$currency_picker);
-		this.$input.after(this.$currency_menu);
+		this.$input.after(this.$currency_picker);
+		this.$currency_picker.after(this.$currency_menu);
 		this.$input.css("padding-left", "82px");
 		this.set_selected_currency(this.get_document_currency(), {
 			update_doc: this.should_initialize_document_currency(),
 		});
 
-		const refresh_conversion_line = frappe.utils.debounce(() => this.refresh_multi_currency_state(), 300);
 		this.$currency_picker.on("click.multi-currency-control", (event) => {
 			event.preventDefault();
 			event.stopPropagation();
@@ -93,9 +106,8 @@ frappe.ui.form.ControlCurrency = class ControlCurrency extends frappe.ui.form.Co
 			});
 		});
 		this.$input.off(".multi-currency-control");
-		this.$input.on("input.multi-currency-control", () => {
-			this.frm?.dirty?.();
-			refresh_conversion_line();
+		this.$input.on("blur.multi-currency-control", () => {
+			this.refresh_multi_currency_state();
 		});
 		$("body").off(`click.multi-currency-${this.df.fieldname}`);
 		$("body").on(`click.multi-currency-${this.df.fieldname}`, () => {

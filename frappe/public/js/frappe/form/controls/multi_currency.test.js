@@ -1,5 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const {
 	calculate_base_amount,
@@ -363,6 +365,42 @@ test("should_rebuild_multi_currency_input detects grid input replaced outside ex
 		}),
 		true
 	);
+});
+
+test("multi-currency amount control refreshes its conversion line on blur", () => {
+	const control_source = fs.readFileSync(path.join(__dirname, "currency.js"), "utf8");
+	const setup_method = control_source.match(
+		/\n\tsetup_multi_currency_input\(\) \{([\s\S]*?)\n\treset_multi_currency_input_shell\(\) \{/
+	)?.[1];
+
+	assert.ok(setup_method, "setup_multi_currency_input method should exist");
+	assert.match(setup_method, /\$input\.on\("blur\.multi-currency-control",/);
+	assert.doesNotMatch(setup_method, /\$input\.on\("input\.multi-currency-control",/);
+	assert.doesNotMatch(setup_method, /this\.frm\?\.dirty\?\.\(\);/);
+});
+
+test("multi-currency picker keeps normal stacking order until its menu is opened", () => {
+	const control_source = fs.readFileSync(path.join(__dirname, "currency.js"), "utf8");
+	const setup_method = control_source.match(
+		/\n\tsetup_multi_currency_input\(\) \{([\s\S]*?)\n\treset_multi_currency_input_shell\(\) \{/
+	)?.[1];
+
+	assert.ok(setup_method, "setup_multi_currency_input method should exist");
+	assert.doesNotMatch(setup_method, /multi-currency-picker[^`]*z-index:\s*[1-9]/);
+	assert.match(setup_method, /\$input\.after\(this\.\$currency_picker\);/);
+});
+
+test("multi-currency amount control commits only on native change", () => {
+	const control_source = fs.readFileSync(path.join(__dirname, "currency.js"), "utf8");
+	const bind_change_event = control_source.match(
+		/\n\tbind_change_event\(\) \{([\s\S]*?)\n\tmake_input\(\) \{/
+	)?.[1];
+
+	assert.ok(bind_change_event, "ControlCurrency should specialize bind_change_event");
+	assert.match(bind_change_event, /if \(!this\.is_multi_currency\(\)\) \{\s*return super\.bind_change_event\(\);\s*\}/);
+	assert.match(bind_change_event, /if \(this\.change\) this\.change\(e\);\s*else \{\s*this\.parse_validate_and_set_in_model\(this\.get_input_value\(\), e\);\s*\}/);
+	assert.match(bind_change_event, /this\.\$input\.on\("change", change_handler\);/);
+	assert.doesNotMatch(bind_change_event, /this\.\$input\.on\("input"/);
 });
 
 test("open_grid_multi_currency_menu opens the picker on first grid row activation", () => {
