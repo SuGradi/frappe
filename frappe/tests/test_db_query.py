@@ -1221,6 +1221,8 @@ class TestNumericFilterSQL(FrappeTestCase):
 			("Recorder", "duration"),
 			("DocType", "max_attachments"),
 			("RQ Worker", "utilization_percent"),
+			("DocType", "idx"),
+			("DocType", "docstatus"),
 		)
 
 		with patch.dict(frappe.conf, {"db_type": "postgres"}):

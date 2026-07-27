@@ -122,6 +122,7 @@
 			!fieldname ||
 			!doctype ||
 			fieldname === "_aggregate_column" ||
+			(fieldname === "docstatus" && column.docfield.name === "status") ||
 			column.docfield.is_virtual
 		) {
 			return null;

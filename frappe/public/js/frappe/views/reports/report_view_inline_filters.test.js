@@ -121,6 +121,19 @@ test("report inline filters omit blank and malformed column values", () => {
 	assert.deepEqual(build_report_inline_filters({}, columns), { filters: [], values: {} });
 });
 
+test("derived status columns do not filter the numeric docstatus field", () => {
+	const status = {
+		field: "docstatus",
+		docfield: { name: "status", parent: "gendan", fieldtype: "Data" },
+	};
+
+	assert.equal(get_report_inline_filter_key(status), null);
+	assert.deepEqual(build_report_inline_filters({ 0: "Draft" }, [status]), {
+		filters: [],
+		values: {},
+	});
+});
+
 test("inline filters append without mutating standard filters", () => {
 	const standard_filters = [["gendan", "company", "=", "海纳"]];
 	const inline_filters = [["gendan", "name", "like", "%HN260%"]];
