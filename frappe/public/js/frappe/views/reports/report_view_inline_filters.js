@@ -37,6 +37,18 @@
 			}
 		}
 
+		const options = String(docfield.options || "").trim();
+		if (
+			docfield.fieldtype === "Currency" &&
+			(options === "Multi Currency" || options.startsWith("Multi Currency:"))
+		) {
+			return ["like", `%${text}%`];
+		}
+
+		if (docfield.fieldtype === "Datetime" && /^\d{4}-\d{2}-\d{2}$/.test(text)) {
+			return ["between", [text, text]];
+		}
+
 		if (exact_match_fieldtypes.has(docfield.fieldtype)) {
 			return ["=", text];
 		}

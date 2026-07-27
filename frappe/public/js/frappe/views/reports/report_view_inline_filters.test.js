@@ -52,6 +52,20 @@ test("date and numeric columns use field-valid equality filters", () => {
 	]);
 });
 
+test("datetime dates cover the full day and multi-currency values search stored JSON", () => {
+	assert.deepEqual(parse_inline_filter_expression("2026-07-27", { fieldtype: "Datetime" }), [
+		"between",
+		["2026-07-27", "2026-07-27"],
+	]);
+	assert.deepEqual(
+		parse_inline_filter_expression("USD", {
+			fieldtype: "Currency",
+			options: "Multi Currency:currency",
+		}),
+		["like", "%USD%"]
+	);
+});
+
 test("report inline filters map parent and child columns to database filters", () => {
 	const columns = [
 		{ id: "_checkbox" },
