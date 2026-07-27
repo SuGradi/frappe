@@ -1412,6 +1412,7 @@ class TestReportView(FrappeTestCase):
 			self.assertEqual(frappe.get_list("Blog Post", "published"), [])
 
 	def test_reportview_rejects_filter_on_field_without_read_permission(self):
+		frappe.set_user("Administrator")
 		with setup_patched_blog_post(), setup_test_user(set_user=True):
 			frappe.local.request = frappe._dict(method="POST")
 			frappe.local.form_dict = frappe._dict(
