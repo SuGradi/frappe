@@ -1,5 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 const {
 	append_report_inline_filters,
@@ -88,4 +90,19 @@ test("server-backed DataTable filtering keeps every returned row visible", () =>
 		get_all_row_indices([{ meta: { rowIndex: 0 } }, { meta: { rowIndex: 4 } }]),
 		[0, 4]
 	);
+});
+
+test("Report View wires inline inputs to server-side filters", () => {
+	const report_view_source = fs.readFileSync(path.join(__dirname, "report_view.js"), "utf8");
+
+	assert.match(report_view_source, /import "\.\/report_view_inline_filters\.js";/);
+	assert.match(report_view_source, /filterRows:\s*report_inline_filters\.get_all_row_indices/);
+	assert.match(report_view_source, /bind_inline_filter_events\(\)/);
+	assert.match(report_view_source, /frappe\.utils\.debounce\([\s\S]*?500\s*\)/);
+	assert.match(
+		report_view_source,
+		/get_filters_for_args\(\)[\s\S]*?append_report_inline_filters/
+	);
+	assert.match(report_view_source, /this\.start = 0;[\s\S]*?this\.refresh\(\)/);
+	assert.match(report_view_source, /has_inline_filters\(\)/);
 });

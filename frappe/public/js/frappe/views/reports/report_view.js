@@ -2,9 +2,11 @@
  * frappe.views.ReportView
  */
 import DataTable from "frappe-datatable";
+import "./report_view_inline_filters.js";
 
 window.DataTable = DataTable;
 frappe.provide("frappe.views");
+const report_inline_filters = frappe.views.report_inline_filters;
 
 frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 	get view_name() {
@@ -139,6 +141,13 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 		return args;
 	}
 
+	get_filters_for_args() {
+		return report_inline_filters.append_report_inline_filters(
+			super.get_filters_for_args(),
+			this.inline_filters || []
+		);
+	}
+
 	before_refresh() {
 		if (this.report_doc) {
 			// don't parse frappe.route_options if this is a Custom Report
@@ -240,7 +249,7 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 	}
 
 	render(force) {
-		if (this.data.length === 0) return;
+		if (this.data.length === 0 && !this.has_inline_filters()) return;
 		this.render_count();
 		this.setup_columns();
 
@@ -252,9 +261,18 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 
 		if (this.datatable && !force) {
 			this.datatable.refresh(this.get_data(this.data), this.columns);
+			this.restore_inline_filter_values();
 			return;
 		}
 		this.setup_datatable(this.data);
+	}
+
+	toggle_result_area() {
+		super.toggle_result_area();
+		if (this.has_inline_filters()) {
+			this.$result.show();
+			this.$no_result.hide();
+		}
 	}
 
 	get_count_element() {
@@ -339,6 +357,7 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 			translations: frappe.utils.datatable.get_translations(),
 			checkboxColumn: true,
 			inlineFilters: true,
+			filterRows: report_inline_filters.get_all_row_indices,
 			cellHeight: 35,
 			direction: frappe.utils.is_rtl() ? "rtl" : "ltr",
 			events: {
@@ -429,6 +448,44 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 				},
 			],
 		});
+		this.bind_inline_filter_events();
+		this.restore_inline_filter_values();
+	}
+
+	bind_inline_filter_events() {
+		this.apply_inline_filter_values ||= frappe.utils.debounce(() => {
+			const next = report_inline_filters.build_report_inline_filters(
+				this.datatable?.columnmanager.getAppliedFilters() || {},
+				this.datatable?.getColumns() || []
+			);
+			const changed =
+				JSON.stringify(next.values) !== JSON.stringify(this.inline_filter_values || {});
+
+			this.inline_filter_values = next.values;
+			this.restore_inline_filter_values();
+			if (!changed) return;
+
+			this.inline_filters = next.filters;
+			this.start = 0;
+			this.refresh();
+		}, 500);
+
+		this.$datatable_wrapper
+			.off("input.report-view-inline-filter")
+			.on("input.report-view-inline-filter", ".dt-filter", () => {
+				this.apply_inline_filter_values();
+			});
+	}
+
+	restore_inline_filter_values() {
+		const values = this.inline_filter_values || {};
+		this.$datatable_wrapper.find(".dt-filter").each((_index, input) => {
+			input.value = values[input.dataset.colIndex] || "";
+		});
+	}
+
+	has_inline_filters() {
+		return Boolean(this.inline_filters?.length);
 	}
 
 	toggle_charts() {
