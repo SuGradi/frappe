@@ -6,7 +6,9 @@ const path = require("node:path");
 const {
 	append_report_inline_filters,
 	build_report_inline_filters,
+	build_report_inline_filters_from_state,
 	create_refresh_generation,
+	get_report_inline_filter_key,
 	get_all_row_indices,
 	parse_inline_filter_expression,
 } = require("./report_view_inline_filters.js");
@@ -38,6 +40,18 @@ test("inline filter expressions reject blank operands", () => {
 	assert.equal(parse_inline_filter_expression("!="), null);
 });
 
+test("date and numeric columns use field-valid equality filters", () => {
+	assert.deepEqual(parse_inline_filter_expression("2026-07-27", { fieldtype: "Date" }), [
+		"=",
+		"2026-07-27",
+	]);
+	assert.deepEqual(parse_inline_filter_expression("10", { fieldtype: "Currency" }), ["=", "10"]);
+	assert.deepEqual(parse_inline_filter_expression("10", { fieldtype: "Data" }), [
+		"like",
+		"%10%",
+	]);
+});
+
 test("report inline filters map parent and child columns to database filters", () => {
 	const columns = [
 		{ id: "_checkbox" },
@@ -57,7 +71,7 @@ test("report inline filters map parent and child columns to database filters", (
 				["gendan", "name", "like", "%G-2607%"],
 				["gendan_vehicle_item", "vehicle_vin", "like", "%LVR%"],
 			],
-			values: { 1: "G-2607", 2: "LVR" },
+			values: { "gendan::name": "G-2607", "gendan_vehicle_item::vehicle_vin": "LVR" },
 		}
 	);
 });
@@ -86,6 +100,31 @@ test("inline filters append without mutating standard filters", () => {
 	assert.deepEqual(standard_filters, [["gendan", "company", "=", "海纳"]]);
 });
 
+test("inline filter state follows stable fields when columns move", () => {
+	const name = { field: "name", docfield: { parent: "gendan", fieldtype: "Data" } };
+	const vin = {
+		field: "vehicle_vin",
+		docfield: { parent: "gendan_vehicle_item", fieldtype: "Data" },
+	};
+	const state = build_report_inline_filters({ 0: "G-2607", 1: "LVR" }, [name, vin]).values;
+
+	assert.equal(get_report_inline_filter_key(name), "gendan::name");
+	assert.deepEqual(build_report_inline_filters_from_state(state, [vin, name]), {
+		filters: [
+			["gendan_vehicle_item", "vehicle_vin", "like", "%LVR%"],
+			["gendan", "name", "like", "%G-2607%"],
+		],
+		values: {
+			"gendan_vehicle_item::vehicle_vin": "LVR",
+			"gendan::name": "G-2607",
+		},
+	});
+	assert.deepEqual(build_report_inline_filters_from_state(state, [name]), {
+		filters: [["gendan", "name", "like", "%G-2607%"]],
+		values: { "gendan::name": "G-2607" },
+	});
+});
+
 test("server-backed DataTable filtering keeps every returned row visible", () => {
 	assert.deepEqual(
 		get_all_row_indices([{ meta: { rowIndex: 0 } }, { meta: { rowIndex: 4 } }]),
@@ -100,6 +139,7 @@ test("refresh generation accepts only the latest report request", () => {
 
 	assert.equal(refresh_generation.is_current(first), false);
 	assert.equal(refresh_generation.is_current(second), true);
+	assert.equal(refresh_generation.current(), second);
 });
 
 test("Report View wires inline inputs to server-side filters", () => {
@@ -113,11 +153,32 @@ test("Report View wires inline inputs to server-side filters", () => {
 		report_view_source,
 		/get_filters_for_args\(\)[\s\S]*?append_report_inline_filters/
 	);
-	assert.match(report_view_source, /this\.start = 0;[\s\S]*?this\.refresh\(\)/);
-	assert.match(report_view_source, /has_inline_filters\(\)/);
-	assert.match(report_view_source, /refresh_generation\.begin\(\)/);
 	assert.match(
 		report_view_source,
-		/refresh_generation\.is_current\([^)]+\)[\s\S]*?prepare_data\(/
+		/get_filters_for_args\(\)[\s\S]*?build_report_inline_filters_from_state/
 	);
+	assert.match(report_view_source, /this\.start = 0;[\s\S]*?this\.refresh\(\)/);
+	assert.match(report_view_source, /has_inline_filters\(\)/);
+	assert.doesNotMatch(report_view_source, /^\s*refresh\([^)]*\)\s*{/m);
+	assert.match(
+		report_view_source,
+		/begin_refresh_request\(\)[\s\S]*?refresh_generation\.begin\(\)/
+	);
+	assert.match(report_view_source, /render_count\(\)[\s\S]*?refresh_generation\.is_current/);
+	assert.match(report_view_source, /render_count\(\)[\s\S]*?count_upper_bound[\s\S]*?tooltip/);
+	assert.match(
+		report_view_source,
+		/get_search_params\(\)[\s\S]*?super\.get_filters_for_args\(\)/
+	);
+	assert.match(
+		report_view_source,
+		/is_refresh_request_current\([^)]+\)[\s\S]*?refresh_generation\.is_current/
+	);
+
+	const base_list_source = fs.readFileSync(
+		path.join(__dirname, "../../list/base_list.js"),
+		"utf8"
+	);
+	assert.match(base_list_source, /begin_refresh_request\?\.\(\)/);
+	assert.match(base_list_source, /is_refresh_request_current\?\.\([^)]+\)/);
 });

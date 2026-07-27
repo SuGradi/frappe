@@ -143,30 +143,25 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 	}
 
 	get_filters_for_args() {
+		const inline_filter_state = report_inline_filters.build_report_inline_filters_from_state(
+			this.inline_filter_values || {},
+			this.columns || []
+		);
+		this.inline_filter_values = inline_filter_state.values;
+		this.inline_filters = inline_filter_state.filters;
+
 		return report_inline_filters.append_report_inline_filters(
 			super.get_filters_for_args(),
-			this.inline_filters || []
+			this.inline_filters
 		);
 	}
 
-	refresh() {
-		const args = this.get_call_args();
-		if (this.no_change(args)) return Promise.resolve();
+	begin_refresh_request() {
+		return this.refresh_generation.begin();
+	}
 
-		const generation = this.refresh_generation.begin();
-		this.freeze(true);
-		return frappe.call(args).then((response) => {
-			if (!this.refresh_generation.is_current(generation)) return;
-
-			this.prepare_data(response);
-			this.toggle_result_area();
-			this.before_render();
-			this.render();
-			this.after_render();
-			this.freeze(false);
-			this.reset_defaults();
-			this.settings.refresh?.(this);
-		});
+	is_refresh_request_current(generation) {
+		return this.refresh_generation.is_current(generation);
 	}
 
 	before_refresh() {
@@ -304,6 +299,59 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 				.prependTo(this.$paging_area.find(".level-right"));
 		}
 		return $count;
+	}
+
+	render_count() {
+		if (this.list_view_settings?.disable_count) return;
+
+		const me = this;
+		const generation = this.refresh_generation.current();
+		const current_count = this.data.length;
+		const count_without_children = this.data.uniqBy((row) => row.name).length;
+		const $count = this.get_count_element();
+
+		frappe.db
+			.count(this.doctype, {
+				filters: this.get_filters_for_args(),
+				limit: this.count_upper_bound,
+			})
+			.then((total_count) => {
+				if (!this.refresh_generation.is_current(generation)) return;
+
+				this.total_count = total_count || current_count;
+				this.count_without_children =
+					count_without_children !== current_count ? count_without_children : undefined;
+
+				const count_str =
+					this.total_count === this.count_upper_bound
+						? `${format_number(this.total_count - 1, null, 0)}+`
+						: format_number(this.total_count, null, 0);
+				let text = __("{0} of {1}", [format_number(current_count, null, 0), count_str]);
+				if (this.count_without_children) {
+					text = __("{0} of {1} ({2} rows with children)", [
+						this.count_without_children,
+						count_str,
+						current_count,
+					]);
+				}
+				$count.html(`<span>${text}</span>`);
+				if (this.count_upper_bound && this.count_upper_bound == this.total_count) {
+					$count.attr(
+						"title",
+						__(
+							"The count shown is an estimated count. Click here to see the accurate count."
+						)
+					);
+					$count.tooltip({ delay: { show: 600, hide: 100 }, trigger: "hover" });
+					$count.on("click", () => {
+						me.count_upper_bound = 0;
+						$count.off("click");
+						$count.tooltip("disable");
+						me.freeze();
+						me.render_count();
+					});
+				}
+			});
 	}
 
 	on_update(data) {
@@ -500,8 +548,11 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 
 	restore_inline_filter_values() {
 		const values = this.inline_filter_values || {};
+		const columns = this.datatable?.getColumns() || [];
 		this.$datatable_wrapper.find(".dt-filter").each((_index, input) => {
-			input.value = values[input.dataset.colIndex] || "";
+			const column = columns[Number(input.dataset.colIndex)];
+			const key = report_inline_filters.get_report_inline_filter_key(column);
+			input.value = (key && values[key]) || "";
 		});
 	}
 
@@ -1857,7 +1908,15 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 	}
 
 	get_search_params() {
-		let search_params = super.get_search_params();
+		const search_params = new URLSearchParams();
+		super.get_filters_for_args().forEach((filter) => {
+			if (filter[2] === "=") {
+				search_params.append(filter[1], filter[3]);
+			} else {
+				search_params.append(filter[1], JSON.stringify([filter[2], filter[3]]));
+			}
+		});
+
 		let config = this.group_by_control.get_settings();
 		if (config) {
 			search_params.append(

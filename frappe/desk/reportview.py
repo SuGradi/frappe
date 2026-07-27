@@ -140,14 +140,17 @@ def validate_filters(data, filters):
 				meta, df = get_meta_and_docfield(fieldname, data)
 				if not df:
 					raise_invalid_field(condition[0])
+				validate_filter_field_permission(data, meta, df)
 			else:
 				# [doctype, fieldname, condition, value]
 				fieldname = condition[1]
 				if is_standard(fieldname):
 					continue
 				meta = frappe.get_meta(condition[0])
-				if not meta.get_field(fieldname):
+				df = meta.get_field(fieldname)
+				if not df:
 					raise_invalid_field(fieldname)
+				validate_filter_field_permission(data, meta, df)
 
 	else:
 		for fieldname in filters:
@@ -156,6 +159,13 @@ def validate_filters(data, filters):
 			meta, df = get_meta_and_docfield(fieldname, data)
 			if not df:
 				raise_invalid_field(fieldname)
+			validate_filter_field_permission(data, meta, df)
+
+
+def validate_filter_field_permission(data, meta, df):
+	permitted_fields = get_permitted_fields(meta.name, parenttype=data.doctype)
+	if df.fieldname not in permitted_fields:
+		raise_invalid_field(df.fieldname)
 
 
 def setup_group_by(data):

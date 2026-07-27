@@ -1411,6 +1411,20 @@ class TestReportView(FrappeTestCase):
 			# If none of the fields are accessible then result should be empty
 			self.assertEqual(frappe.get_list("Blog Post", "published"), [])
 
+	def test_reportview_rejects_filter_on_field_without_read_permission(self):
+		with setup_patched_blog_post(), setup_test_user(set_user=True):
+			frappe.local.request = frappe._dict(method="POST")
+			frappe.local.form_dict = frappe._dict(
+				{
+					"doctype": "Blog Post",
+					"fields": ["title"],
+					"filters": [["Blog Post", "published", "=", 1]],
+				}
+			)
+
+			with self.assertRaises(frappe.DataError):
+				execute_cmd("frappe.desk.reportview.get")
+
 	def test_reportview_get_admin(self):
 		# Admin should be able to see access all fields
 		with setup_patched_blog_post():

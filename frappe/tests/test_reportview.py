@@ -1,9 +1,31 @@
 # Copyright (c) 2019, Frappe Technologies Pvt. Ltd. and Contributors
 # License: MIT. See LICENSE
 
+from unittest import TestCase
+from unittest.mock import MagicMock, patch
+
 import frappe
-from frappe.desk.reportview import export_query, extract_fieldnames
+from frappe.desk.reportview import export_query, extract_fieldnames, validate_filters
 from frappe.tests.utils import FrappeTestCase
+
+
+class TestReportviewFilterPermissions(TestCase):
+	def test_rejects_filter_on_field_without_read_permission(self):
+		meta = MagicMock(name="Blog Post")
+		meta.name = "Blog Post"
+		meta.get_field.return_value = frappe._dict(fieldname="published")
+
+		with (
+			patch("frappe.desk.reportview.frappe.get_meta", return_value=meta),
+			patch("frappe.desk.reportview.get_permitted_fields", return_value=["title"]),
+			patch("frappe.desk.reportview.raise_invalid_field") as raise_invalid_field,
+		):
+			validate_filters(
+				frappe._dict(doctype="Blog Post"),
+				[["Blog Post", "published", "=", 1]],
+			)
+
+		raise_invalid_field.assert_called_once_with("published")
 
 
 class TestReportview(FrappeTestCase):

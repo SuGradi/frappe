@@ -498,9 +498,11 @@ frappe.views.BaseList = class BaseList {
 			// console.log('throttled');
 			return Promise.resolve();
 		}
+		const refresh_request = this.begin_refresh_request?.();
 		this.freeze(true);
 		// fetch data from server
 		return frappe.call(args).then((r) => {
+			if (this.is_refresh_request_current?.(refresh_request) === false) return;
 			// render
 			this.prepare_data(r);
 			this.toggle_result_area();
