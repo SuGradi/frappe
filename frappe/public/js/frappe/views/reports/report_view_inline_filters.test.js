@@ -6,6 +6,7 @@ const path = require("node:path");
 const {
 	append_report_inline_filters,
 	build_report_inline_filters,
+	create_refresh_generation,
 	get_all_row_indices,
 	parse_inline_filter_expression,
 } = require("./report_view_inline_filters.js");
@@ -92,6 +93,15 @@ test("server-backed DataTable filtering keeps every returned row visible", () =>
 	);
 });
 
+test("refresh generation accepts only the latest report request", () => {
+	const refresh_generation = create_refresh_generation();
+	const first = refresh_generation.begin();
+	const second = refresh_generation.begin();
+
+	assert.equal(refresh_generation.is_current(first), false);
+	assert.equal(refresh_generation.is_current(second), true);
+});
+
 test("Report View wires inline inputs to server-side filters", () => {
 	const report_view_source = fs.readFileSync(path.join(__dirname, "report_view.js"), "utf8");
 
@@ -105,4 +115,9 @@ test("Report View wires inline inputs to server-side filters", () => {
 	);
 	assert.match(report_view_source, /this\.start = 0;[\s\S]*?this\.refresh\(\)/);
 	assert.match(report_view_source, /has_inline_filters\(\)/);
+	assert.match(report_view_source, /refresh_generation\.begin\(\)/);
+	assert.match(
+		report_view_source,
+		/refresh_generation\.is_current\([^)]+\)[\s\S]*?prepare_data\(/
+	);
 });

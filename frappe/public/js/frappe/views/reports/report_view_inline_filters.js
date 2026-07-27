@@ -63,9 +63,23 @@
 		return rows.map((row) => row.meta.rowIndex);
 	}
 
+	function create_refresh_generation() {
+		let generation = 0;
+		return {
+			begin() {
+				generation += 1;
+				return generation;
+			},
+			is_current(candidate) {
+				return candidate === generation;
+			},
+		};
+	}
+
 	return {
 		append_report_inline_filters,
 		build_report_inline_filters,
+		create_refresh_generation,
 		get_all_row_indices,
 		parse_inline_filter_expression,
 	};

@@ -21,6 +21,7 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 		super.setup_defaults();
 		this.page_title = __("Report:") + " " + this.page_title;
 		this.view = "Report";
+		this.refresh_generation = report_inline_filters.create_refresh_generation();
 
 		this.link_title_doctype_fields = [];
 
@@ -146,6 +147,26 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 			super.get_filters_for_args(),
 			this.inline_filters || []
 		);
+	}
+
+	refresh() {
+		const args = this.get_call_args();
+		if (this.no_change(args)) return Promise.resolve();
+
+		const generation = this.refresh_generation.begin();
+		this.freeze(true);
+		return frappe.call(args).then((response) => {
+			if (!this.refresh_generation.is_current(generation)) return;
+
+			this.prepare_data(response);
+			this.toggle_result_area();
+			this.before_render();
+			this.render();
+			this.after_render();
+			this.freeze(false);
+			this.reset_defaults();
+			this.settings.refresh?.(this);
+		});
 	}
 
 	before_refresh() {
