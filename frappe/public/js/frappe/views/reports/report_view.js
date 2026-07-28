@@ -522,7 +522,7 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 	}
 
 	bind_inline_filter_events() {
-		this.apply_inline_filter_values ||= frappe.utils.debounce(() => {
+		this.apply_inline_filter_values ||= () => {
 			const next = report_inline_filters.build_report_inline_filters(
 				this.datatable?.columnmanager.getAppliedFilters() || {},
 				this.datatable?.getColumns() || []
@@ -537,11 +537,16 @@ frappe.views.ReportView = class ReportView extends frappe.views.ListView {
 			this.inline_filters = next.filters;
 			this.start = 0;
 			this.refresh();
-		}, 500);
+		};
 
 		this.$datatable_wrapper
-			.off("input.report-view-inline-filter")
-			.on("input.report-view-inline-filter", ".dt-filter", () => {
+			.off(".report-view-inline-filter")
+			.on("keydown.report-view-inline-filter", ".dt-filter", (event) => {
+				if (event.key !== "Enter") return;
+				event.preventDefault();
+				this.apply_inline_filter_values();
+			})
+			.on("blur.report-view-inline-filter", ".dt-filter", () => {
 				this.apply_inline_filter_values();
 			});
 	}

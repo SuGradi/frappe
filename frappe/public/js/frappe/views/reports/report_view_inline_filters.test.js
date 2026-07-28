@@ -202,7 +202,17 @@ test("Report View wires inline inputs to server-side filters", () => {
 	assert.match(report_view_source, /import "\.\/report_view_inline_filters\.js";/);
 	assert.match(report_view_source, /filterRows:\s*report_inline_filters\.get_all_row_indices/);
 	assert.match(report_view_source, /bind_inline_filter_events\(\)/);
-	assert.match(report_view_source, /frappe\.utils\.debounce\([\s\S]*?500\s*\)/);
+	assert.doesNotMatch(report_view_source, /frappe\.utils\.debounce\([\s\S]*?500\s*\)/);
+	assert.doesNotMatch(report_view_source, /\.on\("input\.report-view-inline-filter"/);
+	assert.match(report_view_source, /\.off\("\.report-view-inline-filter"\)/);
+	assert.match(
+		report_view_source,
+		/\.on\("keydown\.report-view-inline-filter",\s*"\.dt-filter",[\s\S]*?event\.key !== "Enter"[\s\S]*?event\.preventDefault\(\)[\s\S]*?this\.apply_inline_filter_values\(\)/
+	);
+	assert.match(
+		report_view_source,
+		/\.on\("blur\.report-view-inline-filter",\s*"\.dt-filter",[\s\S]*?this\.apply_inline_filter_values\(\)/
+	);
 	assert.match(
 		report_view_source,
 		/get_filters_for_args\(\)[\s\S]*?append_report_inline_filters/
