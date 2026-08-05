@@ -76,8 +76,7 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 		build_item(url, caption) {
 			if (this.is_docx_url(url)) {
 				return {
-					src: this.get_docx_shell_html(),
-					type: "html",
+					html: this.get_docx_shell_html(),
 					caption: caption || this.get_filename(url),
 					docxUrl: url,
 				};

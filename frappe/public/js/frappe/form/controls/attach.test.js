@@ -177,8 +177,7 @@ test("attachment lightbox helper builds grouped media items from urls and attach
   ]), [
     { src: "/files/a.jpg", type: "image", caption: "a.jpg" },
     {
-      src: helper.get_docx_shell_html(),
-      type: "html",
+      html: helper.get_docx_shell_html(),
       caption: "b.docx",
       docxUrl: "/files/b.docx",
     },
@@ -205,8 +204,7 @@ test("attachment lightbox helper builds grouped media items from urls and attach
   ]), [
     { src: "/files/a.jpg", type: "image", caption: "A 图" },
     {
-      src: helper.get_docx_shell_html(),
-      type: "html",
+      html: helper.get_docx_shell_html(),
       caption: "B 文档",
       docxUrl: "/files/b.docx",
     },
