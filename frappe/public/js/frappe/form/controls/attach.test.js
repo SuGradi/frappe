@@ -141,6 +141,35 @@ function create_docx_slide(url = "/private/files/contract.docx") {
   return { nodes, root, slide };
 }
 
+function create_fake_link(href, target) {
+  const attributes = { href, target };
+  return {
+    attributes,
+    getAttribute(name) {
+      return attributes[name];
+    },
+    setAttribute(name, value) {
+      attributes[name] = value;
+    },
+    removeAttribute(name) {
+      delete attributes[name];
+    },
+  };
+}
+
+function create_fake_link_container(links) {
+  return {
+    find(selector) {
+      assert.equal(selector, ".attached-file-link");
+      return {
+        each(callback) {
+          links.forEach((link, index) => callback(index, link));
+        },
+      };
+    },
+  };
+}
+
 test("attachment lightbox helper detects previewable image video and DOCX urls", () => {
   const helper = get_attachment_lightbox_helper();
 
@@ -158,7 +187,7 @@ test("attachment lightbox helper detects previewable image video and DOCX urls",
   assert.equal(helper.is_previewable_url("/files/demo.jpg"), true);
   assert.equal(helper.is_previewable_url("/files/demo.mp4"), true);
   assert.equal(helper.is_previewable_url("/files/demo.pdf"), false);
-  assert.equal(helper.is_previewable_url("/files/demo.docx"), true);
+  assert.equal(helper.is_previewable_url("/files/demo.docx"), false);
   assert.equal(helper.get_video_format("/files/demo.ogv"), "video/ogg");
   assert.equal(helper.get_video_format("/files/demo.webm"), "video/webm");
   assert.equal(helper.get_video_format("/files/demo.mov"), "video/mp4");
@@ -176,11 +205,6 @@ test("attachment lightbox helper builds grouped media items from urls and attach
     "/files/f.pdf",
   ]), [
     { src: "/files/a.jpg", type: "image", caption: "a.jpg" },
-    {
-      html: helper.get_docx_shell_html(),
-      caption: "b.docx",
-      docxUrl: "/files/b.docx",
-    },
     { src: "/files/c.webp", type: "image", caption: "c.webp" },
     {
       src: "/files/d.mp4",
@@ -204,11 +228,6 @@ test("attachment lightbox helper builds grouped media items from urls and attach
   ]), [
     { src: "/files/a.jpg", type: "image", caption: "A 图" },
     {
-      html: helper.get_docx_shell_html(),
-      caption: "B 文档",
-      docxUrl: "/files/b.docx",
-    },
-    {
       src: "/files/c.mov",
       type: "html5video",
       caption: "C 视频",
@@ -217,7 +236,7 @@ test("attachment lightbox helper builds grouped media items from urls and attach
   ]);
 });
 
-test("attachment lightbox starts from a DOCX item by its file url", async () => {
+test("attachment lightbox start index ignores downloadable DOCX files", async () => {
   const helper = get_attachment_lightbox_helper();
   const items = helper.build_items_from_urls(["/files/a.jpg", "/files/b.docx", "/files/c.mp4"]);
   const original_ensure_resources = helper.ensure_resources;
@@ -230,12 +249,28 @@ test("attachment lightbox starts from a DOCX item by its file url", async () => 
   });
 
   try {
-    await helper.open(items, "/files/b.docx");
+    await helper.open(items, "/files/c.mp4");
   } finally {
     helper.ensure_resources = original_ensure_resources;
   }
 
   assert.equal(shown_options.startIndex, 1);
+});
+
+test("attachment lightbox binding makes DOCX links download directly", () => {
+  const helper = get_attachment_lightbox_helper();
+  const links = [
+    create_fake_link("/files/Contract%2025.DOCX", "_blank"),
+    create_fake_link("/files/photo.jpg", "_blank"),
+  ];
+  const container = create_fake_link_container(links);
+
+  helper.prepare_direct_download_links(container);
+
+  assert.equal(links[0].attributes.target, undefined);
+  assert.equal(links[0].attributes.download, "Contract 25.DOCX");
+  assert.equal(links[1].attributes.target, "_blank");
+  assert.equal(links[1].attributes.download, undefined);
 });
 
 test("DOCX resources reuse an in-flight load and reset after a load error", async () => {

@@ -35,7 +35,7 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 			return /\.docx$/.test(normalized);
 		},
 		is_previewable_url(url) {
-			return this.is_image_url(url) || this.is_video_url(url) || this.is_docx_url(url);
+			return this.is_image_url(url) || this.is_video_url(url);
 		},
 		get_video_format(url) {
 			const normalized = this.normalize_url(url).split("?")[0].toLowerCase();
@@ -120,6 +120,15 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 						attachment.file_name || this.get_filename(attachment.file_url)
 					)
 				);
+		},
+		prepare_direct_download_links($container) {
+			$container.find(".attached-file-link").each((_index, link) => {
+				const href = link.getAttribute("href") || "";
+				if (!this.is_docx_url(href)) return;
+
+				link.removeAttribute("target");
+				link.setAttribute("download", this.get_filename(href));
+			});
 		},
 		get_bundled_asset(path) {
 			return frappe.assets?.bundled_asset?.(path) || frappe.boot?.assets_json?.[path] || path;
@@ -401,6 +410,7 @@ frappe.ui.form.ControlAttach = class ControlAttach extends frappe.ui.form.Contro
 		}
 
 		const helper = frappe.ui.form.get_attachment_lightbox_helper();
+		helper.prepare_direct_download_links($container);
 		$container.off("click.attachmentLightbox").on("click.attachmentLightbox", ".attached-file-link", (event) => {
 			const href = event.currentTarget.getAttribute("href");
 			if (!helper.is_previewable_url(href)) {
