@@ -52,8 +52,8 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 			return `
 				<div class="attachment-docx-preview" data-docx-preview>
 					<div class="attachment-docx-toolbar">
-						<a class="btn btn-default btn-sm btn-icon" data-docx-download target="_blank"
-							rel="noopener" title="${__("下载原文件")}" aria-label="${__("下载原文件")}">
+						<a class="btn btn-default btn-sm btn-icon" data-docx-download download
+							title="${__("下载原文件")}" aria-label="${__("下载原文件")}">
 							${frappe.utils.icon("es-line-download", "sm")}
 						</a>
 					</div>
@@ -215,7 +215,9 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 			const root = slide.el.querySelector("[data-docx-preview]");
 			if (!root) return;
 
-			root.querySelector("[data-docx-download]")?.setAttribute("href", slide.docxUrl);
+			const download = root.querySelector("[data-docx-download]");
+			download?.setAttribute("href", slide.docxUrl);
+			download?.setAttribute("download", this.get_filename(slide.docxUrl));
 			const retry = root.querySelector("[data-docx-retry]");
 			if (retry && !retry.dataset.docxRetryBound) {
 				retry.dataset.docxRetryBound = "1";

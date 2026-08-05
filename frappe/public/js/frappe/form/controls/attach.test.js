@@ -362,6 +362,7 @@ test("DOCX slide preparation binds download and retry actions", async () => {
   const original_render_docx_slide = helper.render_docx_slide;
   const { nodes, slide } = create_docx_slide("/files/demo.docx");
   const calls = [];
+  const shell = helper.get_docx_shell_html();
 
   helper.render_docx_slide = async (_slide, options) => {
     calls.push(options || {});
@@ -375,6 +376,9 @@ test("DOCX slide preparation binds download and retry actions", async () => {
   }
 
   assert.equal(nodes.download.attributes.href, "/files/demo.docx");
+  assert.equal(nodes.download.attributes.download, "demo.docx");
+  assert.match(shell, /data-docx-download download/);
+  assert.doesNotMatch(shell, /data-docx-download[^>]*target="_blank"/);
   assert.equal(nodes.retry.dataset.docxRetryBound, "1");
   assert.deepEqual(calls, [{}, { force: true }]);
 });
