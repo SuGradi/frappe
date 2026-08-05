@@ -28,8 +28,12 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 			const normalized = this.normalize_url(url).split("?")[0].toLowerCase();
 			return /\.(m4v|mov|mp4|og[gv]|webm)$/.test(normalized);
 		},
+		is_docx_url(url) {
+			const normalized = this.normalize_url(url).split("?")[0].toLowerCase();
+			return /\.docx$/.test(normalized);
+		},
 		is_previewable_url(url) {
-			return this.is_image_url(url) || this.is_video_url(url);
+			return this.is_image_url(url) || this.is_video_url(url) || this.is_docx_url(url);
 		},
 		get_video_format(url) {
 			const normalized = this.normalize_url(url).split("?")[0].toLowerCase();
@@ -42,7 +46,41 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 			if (extension === "webm") return "video/webm";
 			return "video/mp4";
 		},
+		get_docx_shell_html() {
+			return `
+				<div class="attachment-docx-preview" data-docx-preview>
+					<div class="attachment-docx-toolbar">
+						<a class="btn btn-default btn-sm btn-icon" data-docx-download target="_blank"
+							rel="noopener" title="${__("下载原文件")}" aria-label="${__("下载原文件")}">
+							${frappe.utils.icon("es-line-download", "sm")}
+						</a>
+					</div>
+					<div class="attachment-docx-viewport">
+						<div class="attachment-docx-status" data-docx-loading>${__("正在加载文档")}</div>
+						<div class="attachment-docx-status hidden" data-docx-error>
+							<span>${__("文档无法预览")}</span>
+							<div class="attachment-docx-error-actions">
+								<button class="btn btn-default btn-sm btn-icon" data-docx-retry
+									title="${__("重试")}" aria-label="${__("重试")}">
+									${frappe.utils.icon("refresh", "sm")}
+								</button>
+							</div>
+						</div>
+						<div class="attachment-docx-content hidden" data-docx-content></div>
+						<div class="attachment-docx-styles" data-docx-styles></div>
+					</div>
+				</div>`;
+		},
 		build_item(url, caption) {
+			if (this.is_docx_url(url)) {
+				return {
+					src: this.get_docx_shell_html(),
+					type: "html",
+					caption: caption || this.get_filename(url),
+					docxUrl: url,
+				};
+			}
+
 			const item = {
 				src: url,
 				type: this.is_video_url(url) ? "html5video" : "image",
@@ -54,6 +92,9 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 			}
 
 			return item;
+		},
+		get_item_url(item) {
+			return item?.docxUrl || item?.src || "";
 		},
 		get_filename(url) {
 			let filename = (this.normalize_url(url).split("/").pop() || "").split("?")[0];
@@ -131,7 +172,9 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 			const normalized_current = this.normalize_url(current_url);
 			const startIndex = Math.max(
 				0,
-				items.findIndex((item) => this.normalize_url(item.src) === normalized_current)
+				items.findIndex(
+					(item) => this.normalize_url(this.get_item_url(item)) === normalized_current
+				)
 			);
 
 			return this.ensure_resources().then((Fancybox) => {

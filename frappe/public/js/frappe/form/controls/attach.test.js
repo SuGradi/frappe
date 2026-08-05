@@ -34,6 +34,11 @@ global.frappe = {
       ControlData: class {},
     },
   },
+  utils: {
+    icon(name) {
+      return `<svg data-icon="${name}"></svg>`;
+    },
+  },
 };
 global.$ = function () {
   return {
@@ -70,7 +75,7 @@ global.frappe.hide_progress = () => {};
 global.frappe.show_progress = () => {};
 global.frappe.show_alert = () => {};
 
-test("attachment lightbox helper detects previewable image and video urls", () => {
+test("attachment lightbox helper detects previewable image video and DOCX urls", () => {
   const helper = get_attachment_lightbox_helper();
 
   assert.equal(helper.is_image_url("/files/demo.jpg"), true);
@@ -80,10 +85,14 @@ test("attachment lightbox helper detects previewable image and video urls", () =
   assert.equal(helper.is_video_url("/files/demo.mp4"), true);
   assert.equal(helper.is_video_url("/files/demo.webm?ver=1"), true);
   assert.equal(helper.is_video_url("/files/demo.pdf"), false);
+  assert.equal(helper.is_docx_url("/files/demo.docx"), true);
+  assert.equal(helper.is_docx_url("/files/DEMO.DOCX?version=2"), true);
+  assert.equal(helper.is_docx_url("/files/demo.doc"), false);
+  assert.equal(helper.is_docx_url("/files/demo.docx.exe"), false);
   assert.equal(helper.is_previewable_url("/files/demo.jpg"), true);
   assert.equal(helper.is_previewable_url("/files/demo.mp4"), true);
   assert.equal(helper.is_previewable_url("/files/demo.pdf"), false);
-  assert.equal(helper.is_previewable_url("/files/demo.docx"), false);
+  assert.equal(helper.is_previewable_url("/files/demo.docx"), true);
   assert.equal(helper.get_video_format("/files/demo.ogv"), "video/ogg");
   assert.equal(helper.get_video_format("/files/demo.webm"), "video/webm");
   assert.equal(helper.get_video_format("/files/demo.mov"), "video/mp4");
@@ -101,6 +110,12 @@ test("attachment lightbox helper builds grouped media items from urls and attach
     "/files/f.pdf",
   ]), [
     { src: "/files/a.jpg", type: "image", caption: "a.jpg" },
+    {
+      src: helper.get_docx_shell_html(),
+      type: "html",
+      caption: "b.docx",
+      docxUrl: "/files/b.docx",
+    },
     { src: "/files/c.webp", type: "image", caption: "c.webp" },
     {
       src: "/files/d.mp4",
@@ -124,12 +139,39 @@ test("attachment lightbox helper builds grouped media items from urls and attach
   ]), [
     { src: "/files/a.jpg", type: "image", caption: "A 图" },
     {
+      src: helper.get_docx_shell_html(),
+      type: "html",
+      caption: "B 文档",
+      docxUrl: "/files/b.docx",
+    },
+    {
       src: "/files/c.mov",
       type: "html5video",
       caption: "C 视频",
       html5videoFormat: "video/mp4",
     },
   ]);
+});
+
+test("attachment lightbox starts from a DOCX item by its file url", async () => {
+  const helper = get_attachment_lightbox_helper();
+  const items = helper.build_items_from_urls(["/files/a.jpg", "/files/b.docx", "/files/c.mp4"]);
+  const original_ensure_resources = helper.ensure_resources;
+  let shown_options = null;
+
+  helper.ensure_resources = async () => ({
+    show(_items, options) {
+      shown_options = options;
+    },
+  });
+
+  try {
+    await helper.open(items, "/files/b.docx");
+  } finally {
+    helper.ensure_resources = original_ensure_resources;
+  }
+
+  assert.equal(shown_options.startIndex, 1);
 });
 
 test("bulk delete removes selected stale urls from multi-attach field", async () => {
