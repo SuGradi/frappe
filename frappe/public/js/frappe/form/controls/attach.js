@@ -1,5 +1,7 @@
 const ATTACHMENT_LIGHTBOX_CSS_URL = "https://sys.autohaina.com/files/fancybox.css";
 const ATTACHMENT_LIGHTBOX_JS_URL = "https://sys.autohaina.com/files/fancybox.umd.js";
+const ATTACHMENT_DOCX_JS_BUNDLE = "docx_preview.bundle.js";
+const ATTACHMENT_DOCX_CSS_BUNDLE = "docx_preview.bundle.css";
 
 frappe.provide("frappe.ui.form");
 
@@ -120,6 +122,152 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 					)
 				);
 		},
+		get_bundled_asset(path) {
+			return frappe.assets?.bundled_asset?.(path) || frappe.boot?.assets_json?.[path] || path;
+		},
+		load_docx_asset({ tag, bundle, marker }) {
+			const selector = `[data-attachment-docx="${marker}"]`;
+			const wait_for_asset = (element) => {
+				if (element.dataset.loaded === "1") return Promise.resolve(element);
+
+				return new Promise((resolve, reject) => {
+					const on_load = () => {
+						element.dataset.loaded = "1";
+						resolve(element);
+					};
+					const on_error = () => {
+						element.remove();
+						reject(new Error(`Unable to load ${bundle}`));
+					};
+					element.addEventListener("load", on_load, { once: true });
+					element.addEventListener("error", on_error, { once: true });
+				});
+			};
+
+			const existing = document.querySelector(selector);
+			if (existing) return wait_for_asset(existing);
+
+			const element = document.createElement(tag);
+			element.dataset.attachmentDocx = marker;
+			const asset_url = this.get_bundled_asset(bundle);
+			const asset_promise = wait_for_asset(element);
+
+			if (tag === "link") {
+				element.rel = "stylesheet";
+				element.href = asset_url;
+				document.head.appendChild(element);
+			} else {
+				element.src = asset_url;
+				element.async = true;
+				document.body.appendChild(element);
+			}
+
+			return asset_promise;
+		},
+		ensure_docx_resources() {
+			if (this.docx_resource_promise) return this.docx_resource_promise;
+
+			const loads = [
+				this.load_docx_asset({
+					tag: "link",
+					bundle: ATTACHMENT_DOCX_CSS_BUNDLE,
+					marker: "css",
+				}),
+			];
+			if (!globalThis.frappeDocxPreview?.renderAsync) {
+				loads.push(
+					this.load_docx_asset({
+						tag: "script",
+						bundle: ATTACHMENT_DOCX_JS_BUNDLE,
+						marker: "js",
+					})
+				);
+			}
+
+			this.docx_resource_promise = Promise.all(loads)
+				.then(() => {
+					if (!globalThis.frappeDocxPreview?.renderAsync) {
+						throw new Error("DOCX renderer unavailable");
+					}
+					return globalThis.frappeDocxPreview;
+				})
+				.catch((error) => {
+					this.docx_resource_promise = null;
+					throw error;
+				});
+
+			return this.docx_resource_promise;
+		},
+		fetch_file(url, options) {
+			return fetch(url, options);
+		},
+		set_docx_state(root, state) {
+			root
+				.querySelector("[data-docx-loading]")
+				?.classList.toggle("hidden", state !== "loading");
+			root.querySelector("[data-docx-error]")?.classList.toggle("hidden", state !== "error");
+			root
+				.querySelector("[data-docx-content]")
+				?.classList.toggle("hidden", state !== "rendered");
+		},
+		prepare_docx_slide(slide) {
+			if (!slide?.docxUrl || !slide.el) return;
+
+			const root = slide.el.querySelector("[data-docx-preview]");
+			if (!root) return;
+
+			root.querySelector("[data-docx-download]")?.setAttribute("href", slide.docxUrl);
+			const retry = root.querySelector("[data-docx-retry]");
+			if (retry && !retry.dataset.docxRetryBound) {
+				retry.dataset.docxRetryBound = "1";
+				retry.addEventListener("click", () =>
+					this.render_docx_slide(slide, { force: true })
+				);
+			}
+
+			return this.render_docx_slide(slide);
+		},
+		async render_docx_slide(slide, { force = false } = {}) {
+			if (!slide?.docxUrl || !slide.el) return;
+			if (!force && ["loading", "rendered"].includes(slide.docxRenderState)) return;
+
+			const root = slide.el.querySelector("[data-docx-preview]");
+			const content = root?.querySelector("[data-docx-content]");
+			const styles = root?.querySelector("[data-docx-styles]");
+			if (!root || !content || !styles) return;
+
+			slide.docxRenderState = "loading";
+			content.replaceChildren();
+			styles.replaceChildren();
+			this.set_docx_state(root, "loading");
+
+			try {
+				const [renderer, response] = await Promise.all([
+					this.ensure_docx_resources(),
+					this.fetch_file(slide.docxUrl, { credentials: "same-origin" }),
+				]);
+				if (!response.ok) {
+					throw new Error(`DOCX request failed with HTTP ${response.status}`);
+				}
+				const buffer = await response.arrayBuffer();
+				if (root.isConnected === false) return;
+
+				await renderer.renderAsync(buffer, content, styles, {
+					breakPages: true,
+					renderHeaders: true,
+					renderFooters: true,
+					useBase64URL: true,
+				});
+				if (root.isConnected === false) return;
+
+				slide.docxRenderState = "rendered";
+				this.set_docx_state(root, "rendered");
+			} catch (error) {
+				slide.docxRenderState = "error";
+				if (root.isConnected !== false) this.set_docx_state(root, "error");
+				console.error("Unable to preview DOCX attachment", error);
+			}
+		},
 		ensure_resources() {
 			if (typeof window === "undefined") {
 				return Promise.resolve();
@@ -191,6 +339,11 @@ frappe.ui.form.get_attachment_lightbox_helper = frappe.ui.form.get_attachment_li
 					hideClass: false,
 					hideScrollbar: false,
 					placeFocusBack: false,
+					on: {
+						"Carousel.attachSlideEl": (_fancybox, _carousel, slide) => {
+							if (slide?.docxUrl) this.prepare_docx_slide(slide);
+						},
+					},
 				});
 			});
 		},
