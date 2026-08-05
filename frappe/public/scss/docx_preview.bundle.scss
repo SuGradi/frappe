@@ -1,0 +1,72 @@
+.attachment-docx-preview {
+	display: flex;
+	flex-direction: column;
+	width: min(1100px, 94vw);
+	height: min(900px, 88vh);
+	background: var(--bg-light-gray);
+	color: var(--text-color);
+}
+
+.attachment-docx-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	min-height: 48px;
+	padding: 8px 64px 8px 12px;
+	border-bottom: 1px solid var(--border-color);
+	background: var(--fg-color);
+}
+
+.attachment-docx-viewport {
+	position: relative;
+	flex: 1 1 auto;
+	min-height: 0;
+	overflow: auto;
+	padding: 24px;
+}
+
+.attachment-docx-status {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 100%;
+	color: var(--text-muted);
+}
+
+.attachment-docx-error-actions {
+	display: inline-flex;
+	margin-left: 8px;
+}
+
+.attachment-docx-content {
+	min-width: min-content;
+}
+
+.attachment-docx-content .docx-wrapper {
+	padding: 0;
+	background: transparent;
+}
+
+.attachment-docx-content .docx {
+	margin: 0 auto 24px;
+	box-shadow: var(--shadow-md);
+}
+
+.attachment-docx-styles {
+	display: contents;
+}
+
+@media (max-width: 767px) {
+	.attachment-docx-preview {
+		width: 100vw;
+		height: 100dvh;
+	}
+
+	.attachment-docx-toolbar {
+		padding-right: 56px;
+	}
+
+	.attachment-docx-viewport {
+		padding: 12px;
+	}
+}

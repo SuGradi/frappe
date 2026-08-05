@@ -1,5 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
 
 global.__ = (value) => value;
 global.window = {
@@ -406,6 +408,20 @@ test("Fancybox attachment callback prepares DOCX slides only", async () => {
     helper.ensure_resources = original_ensure_resources;
     helper.prepare_docx_slide = original_prepare_docx_slide;
   }
+});
+
+test("DOCX preview stylesheet provides stable desktop and mobile reader dimensions", () => {
+  const docx_styles = fs.readFileSync(
+    path.resolve(__dirname, "../../../../scss/docx_preview.bundle.scss"),
+    "utf8"
+  );
+
+  assert.match(docx_styles, /\.attachment-docx-preview/);
+  assert.match(docx_styles, /\.attachment-docx-toolbar/);
+  assert.match(docx_styles, /\.attachment-docx-viewport/);
+  assert.match(docx_styles, /\.attachment-docx-content/);
+  assert.match(docx_styles, /@media\s*\(max-width:\s*767px\)/);
+  assert.match(docx_styles, /100dvh/);
 });
 
 test("bulk delete removes selected stale urls from multi-attach field", async () => {
