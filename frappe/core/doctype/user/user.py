@@ -75,7 +75,7 @@ class User(Document):
 		block_modules: DF.Table[BlockModule]
 		bulk_actions: DF.Check
 		bypass_restrict_ip_check_if_2fa_enabled: DF.Check
-		company: DF.Link
+		company: DF.Link | None
 		dashboard: DF.Check
 		default_app: DF.Literal[None]
 		default_workspace: DF.Link | None
@@ -137,6 +137,7 @@ class User(Document):
 		user_type: DF.Link | None
 		username: DF.Data | None
 		view_switcher: DF.Check
+		wecom_userids: DF.SmallText | None
 	# end: auto-generated types
 	__new_password = None
 

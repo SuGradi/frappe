@@ -18,6 +18,7 @@
   "full_name",
   "username",
   "company",
+  "wecom_userids",
   "column_break_11",
   "language",
   "time_zone",
@@ -819,8 +820,12 @@
    "fieldname": "company",
    "fieldtype": "Link",
    "label": "\u516c\u53f8",
-   "options": "Company",
-    "reqd": 0
+   "options": "Company"
+  },
+  {
+   "fieldname": "wecom_userids",
+   "fieldtype": "Small Text",
+   "label": "\u4f01\u4e1a\u5fae\u4fe1\u7ed1\u5b9a"
   }
  ],
  "icon": "fa fa-user",
@@ -884,7 +889,7 @@
   }
  ],
  "make_attachments_public": 1,
- "modified": "2025-11-06 19:48:55.762698",
+ "modified": "2026-08-06 21:01:19.112186",
  "modified_by": "Administrator",
  "module": "Core",
  "name": "User",
