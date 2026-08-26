@@ -1301,6 +1301,8 @@ class BaseDocument:
 	def get_value(self, fieldname):
 		df = self.meta.get_field(fieldname)
 		val = self.get(fieldname)
+		if _is_multi_currency_df(df):
+			return val
 
 		return self.cast(val, df)
 

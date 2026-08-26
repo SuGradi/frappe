@@ -133,6 +133,33 @@ class TestMultiCurrencyFieldtype(unittest.TestCase):
 
 		self.assertEqual(valid_dict.amount, '{"currency":"CNY","amount":123,"exchange_rate":1}')
 
+	def test_multi_currency_get_value_keeps_json_value(self):
+		field = frappe._dict(
+			{
+				"fieldname": "amount",
+				"fieldtype": "Currency",
+				"options": "Multi Currency:currency",
+			}
+		)
+		meta = frappe._dict({"fields": [field]})
+		meta.get_table_fields = lambda: ()
+		meta.get_field = lambda fieldname: field if fieldname == "amount" else None
+
+		original_meta = BaseDocument.meta
+		BaseDocument.meta = property(lambda self: meta)
+		try:
+			doc = BaseDocument(
+				{
+					"doctype": "Test Multi Currency Doc",
+					"amount": '{"currency":"CNY","amount":123,"exchange_rate":1}',
+				}
+			)
+			value = doc.get_value("amount")
+		finally:
+			BaseDocument.meta = original_meta
+
+		self.assertEqual(value, '{"currency":"CNY","amount":123,"exchange_rate":1}')
+
 	def test_multi_currency_numeric_cast_accepts_trimmed_option(self):
 		meta = frappe._dict(
 			{
