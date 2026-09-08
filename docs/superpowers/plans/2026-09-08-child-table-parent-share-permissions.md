@@ -16,7 +16,7 @@
 - Modify: `frappe/model/meta.py:618`
 - Test: `frappe/tests/test_model_utils.py`
 
-- [ ] **Step 1: Write the failing regression test**
+- [x] **Step 1: Write the failing regression test**
 
 Import `patch` from `unittest.mock`. In `TestModelUtils.test_get_permitted_fields`, mock `frappe.share.get_shared` so only `Installed Applications` reports a shared document, then assert that `app_name` from child DocType `Installed Application` is permitted when `parenttype="Installed Applications"` is supplied:
 
@@ -31,17 +31,17 @@ with set_user("Guest"), patch("frappe.share.get_shared", side_effect=shared_pare
 	)
 ```
 
-- [ ] **Step 2: Run the test and verify the regression is exposed**
+- [x] **Step 2: Run the test and verify the regression is exposed**
 
 Run:
 
 ```bash
-bench --site sys.autohaina.com run-tests --app frappe --module frappe.tests.test_model_utils --test TestModelUtils.test_get_permitted_fields
+bench --site sys.autohaina.com run-tests --app frappe --module frappe.tests.test_model_utils --case TestModelUtils
 ```
 
-Expected: FAIL because the current implementation asks for `Installed Application` shares and excludes `app_name`.
+Expected: three tests run, with `test_get_permitted_fields` failing because the current implementation asks for `Installed Application` shares and excludes `app_name`.
 
-- [ ] **Step 3: Implement the minimal permission correction**
+- [x] **Step 3: Implement the minimal permission correction**
 
 In `Meta.get_permitted_fieldnames()`, select the parent DocType only for child metadata with an explicit parent context:
 
@@ -51,22 +51,22 @@ if frappe.share.get_shared(shared_doctype, user, rights=[permission_type], limit
 	permlevel_access.add(0)
 ```
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run:
 
 ```bash
 bench --site sys.autohaina.com run-tests --app frappe --module frappe.tests.test_model_utils
-bench --site sys.autohaina.com run-tests --app frappe --module frappe.tests.test_reportview
+bench --site sys.autohaina.com run-tests --app frappe --module frappe.tests.test_reportview --case TestReportviewFilterPermissions
 ```
 
-Expected: both modules pass with no failures.
+Expected: both focused runs pass with no failures. Run the complete `frappe.tests.test_reportview` module on modified and baseline source when checking unrelated report regressions.
 
-- [ ] **Step 5: Verify the affected sys user without writing data**
+- [x] **Step 5: Verify the affected sys user without writing data**
 
 Under `s15159320575@qq.com`, assert that `get_permitted_fields("xunjia_items", parenttype="xunjia")` contains `vehicles` and `vehicle_price`, validate the Report View `vehicles` filter, and execute the saved report field query to confirm returned `vehicle_price` values match stored child rows.
 
-- [ ] **Step 6: Review and commit**
+- [x] **Step 6: Review and commit**
 
 Run `git diff --check`, inspect the scoped diff, and commit only the plan, test, and permission implementation:
 

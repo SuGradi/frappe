@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from random import choice
+from unittest.mock import patch
 
 import frappe
 from frappe.model import core_doctypes_list, get_permitted_fields, is_default_field
@@ -61,6 +62,15 @@ class TestModelUtils(FrappeTestCase):
 			self.assertNotIn("app_name", get_permitted_fields("Installed Application"))
 			self.assertNotIn(
 				"app_name", get_permitted_fields("Installed Application", parenttype="Installed Applications")
+			)
+
+		def shared_parent_only(doctype, *_args, **_kwargs):
+			return ["Installed Applications"] if doctype == "Installed Applications" else []
+
+		with set_user("Guest"), patch("frappe.share.get_shared", side_effect=shared_parent_only):
+			self.assertIn(
+				"app_name",
+				get_permitted_fields("Installed Application", parenttype="Installed Applications"),
 			)
 
 	def test_is_default_field(self):
