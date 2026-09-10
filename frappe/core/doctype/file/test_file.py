@@ -5,8 +5,10 @@ import json
 import os
 import shutil
 import tempfile
+import unittest
 from contextlib import contextmanager
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock, patch
 
 import frappe
 from frappe import _
@@ -18,7 +20,7 @@ from frappe.core.api.file import (
 	unzip_file,
 )
 from frappe.core.doctype.file.exceptions import FileTypeNotAllowed
-from frappe.core.doctype.file.utils import get_corrupted_image_msg, get_extension
+from frappe.core.doctype.file.utils import get_corrupted_image_msg, get_extension, setup_folder_path
 from frappe.desk.form.utils import add_comment
 from frappe.exceptions import ValidationError
 from frappe.tests.utils import FrappeTestCase, change_settings
@@ -254,6 +256,24 @@ class TestSameContent(FrappeTestCase):
 		self.assertRaises(frappe.exceptions.AttachmentLimitReached, file2.insert)
 		limit_property.delete()
 		frappe.clear_cache(doctype="ToDo")
+
+
+class TestSetupFolderPath(unittest.TestCase):
+	def test_setup_folder_path_skips_file_validation_for_rename_cascade(self):
+		file = MagicMock(is_folder=False)
+		with patch("frappe.core.doctype.file.utils.frappe.get_doc", return_value=file):
+			setup_folder_path("Home/Parent/Child", "Home/Renamed Parent", ignore_permissions=True)
+
+		file.db_set.assert_called_once_with("folder", "Home/Renamed Parent")
+		file.save.assert_not_called()
+
+	def test_setup_folder_path_keeps_permission_check_for_manual_move(self):
+		file = MagicMock(is_folder=False)
+		with patch("frappe.core.doctype.file.utils.frappe.get_doc", return_value=file):
+			setup_folder_path("Home/Parent/File", "Home/New Parent")
+
+		file.save.assert_called_once_with()
+		file.db_set.assert_not_called()
 
 
 class TestFile(FrappeTestCase):

@@ -146,7 +146,7 @@ class File(Document):
 
 	def after_rename(self, *args, **kwargs):
 		for successor in self.get_successors():
-			setup_folder_path(successor, self.name)
+			setup_folder_path(successor, self.name, ignore_permissions=True)
 
 	def on_trash(self):
 		if self.is_home_folder or self.is_attachments_folder:

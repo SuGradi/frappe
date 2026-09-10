@@ -40,10 +40,13 @@ def make_home_folder() -> None:
 	).insert(ignore_if_duplicate=True)
 
 
-def setup_folder_path(filename: str, new_parent: str) -> None:
+def setup_folder_path(filename: str, new_parent: str, ignore_permissions: bool = False) -> None:
 	file: "File" = frappe.get_doc("File", filename)
-	file.folder = new_parent
-	file.save()
+	if ignore_permissions:
+		file.db_set("folder", new_parent)
+	else:
+		file.folder = new_parent
+		file.save()
 
 	if file.is_folder:
 		from frappe.model.rename_doc import rename_doc
